@@ -7,7 +7,7 @@
 int main() {
     stdio_usb_init();
 
-    const uint LED_PIN = 13;
+    const uint LED_PIN = PICO_DEFAULT_LED_PIN;
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     while (true) {

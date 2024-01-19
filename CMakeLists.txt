@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
+set(PICO_BOARD "adafruit_feather_rp2040")
 
 # Pull in SDK before project
 include(pico_sdk_import.cmake)
