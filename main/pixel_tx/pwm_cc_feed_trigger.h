@@ -14,21 +14,23 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#ifndef SUPER_SCORPIO_PWM_CC_FEED_TRIGGER_H
+#define SUPER_SCORPIO_PWM_CC_FEED_TRIGGER_H
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
+#include "tick_log/tick_log.h"
+#include "pixel_tx.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
+#include "hardware/dma.h"
 
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
+#define PWM_SENTINEL_SLICE (4u)
+#define PWM_SENTINEL_SLICE_MASK (1u << PWM_SENTINEL_SLICE)
+
+void init_dma_pwm_cc_feed_trigger();
+
+
+__force_inline static void trigger_pwm_cc_feeds() {
+    log_tick("trigger_pwm_cc_feeds()");
+    dma_hw->multi_channel_trigger = DMA_PWM_CC_FEED_TRIGGER_CHAN_MASK;
 }
+
+#endif //SUPER_SCORPIO_PWM_CC_FEED_TRIGGER_H

@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#include "common.h"
+#include "pixel_rx.h"
 
 #include <stdio.h>
-#include "pico/multicore.h"
 #include "pico/stdlib.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
+void core0_pixel_rx() {
+    printf("Starting core0_pixel_rx()\n");
 
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
+    while (true) {
+        tight_loop_contents();
+    }
 }

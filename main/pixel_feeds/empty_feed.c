@@ -14,21 +14,22 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#include "empty_feed.h"
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
-
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
+static void __not_in_flash_func(empty_feed__open_frame)(tx_feed_t * this, uint8_t gpio_num) {
 }
+
+static bool __not_in_flash_func(empty_feed__advance_pixel)(tx_feed_t * this, uint8_t gpio_num) {
+    return false;
+}
+
+static void __not_in_flash_func(empty_feed__close_frame)(tx_feed_t * this, uint8_t gpio_num) {
+    // no-op
+}
+
+tx_feed_t __scratch_y("super_scorpio") empty_feed = {
+        .open_frame = empty_feed__open_frame,
+        .advance_pixel = empty_feed__advance_pixel,
+        .close_frame = empty_feed__close_frame
+};

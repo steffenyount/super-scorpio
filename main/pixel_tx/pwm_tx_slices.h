@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#ifndef SUPER_SCORPIO_PWM_TX_SLICES_H
+#define SUPER_SCORPIO_PWM_TX_SLICES_H
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
+#define WS2812_BITS_PER_SEC (800000u)
+#define WS2812_PWM_BIT_PERIOD (10u)
+// WS2812 reset: gpio pin low for 280us
+#define WS2812_PWM_RESET_PERIOD (2240u)
+#define WS2812_PWM_OFF_BIT (0u)
+#define WS2812_PWM_LOW_BIT (3u)
+#define WS2812_PWM_HIGH_BIT (7u)
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
+void init_pwm_tx_slices();
 
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
-}
+#endif //SUPER_SCORPIO_PWM_TX_SLICES_H

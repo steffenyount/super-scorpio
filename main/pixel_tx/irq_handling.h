@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#ifndef SUPER_SCORPIO_IRQ_HANDLING_H
+#define SUPER_SCORPIO_IRQ_HANDLING_H
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
+#include "pixel_tx.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
+#define PWM_SLICE_LOWER_CC_SAMPLES (1000u)
 
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
-}
+extern uint32_t pwm_count;
+extern uint16_t pwm_slice2_lower_cc_vals[PWM_SLICE_LOWER_CC_SAMPLES];
+
+void init_irq_handling();
+
+#endif //SUPER_SCORPIO_IRQ_HANDLING_H

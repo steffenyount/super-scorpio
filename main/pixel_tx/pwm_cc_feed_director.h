@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#ifndef SUPER_SCORPIO_PWM_CC_FEED_DIRECTOR_H
+#define SUPER_SCORPIO_PWM_CC_FEED_DIRECTOR_H
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
+#include "pixel_tx.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
+#include "hardware/dma.h"
 
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
-}
+extern uint32_t * rxf_dests_for_dma_pwm_cc_feed[17];
+extern uint32_t * rxf_dests_for_dma_pwm_cc_feed_last[17];
+
+
+void init_dma_pwm_cc_feed_director();
+
+#endif //SUPER_SCORPIO_PWM_CC_FEED_DIRECTOR_H

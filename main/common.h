@@ -14,21 +14,14 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#ifndef SUPER_SCORPIO_COMMON_H
+#define SUPER_SCORPIO_COMMON_H
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
+#include "pico/platform.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
-    }
+#define __alignment(size_bits) __attribute__((aligned(1u << size_bits)))
 
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
-}
+#define SCORPIO_DEFAULT_WS2812_PIN (4u)
+#define NUM_PWM_SLICES_MASK ((1u << NUM_PWM_SLICES) - 1u)
+
+#endif //SUPER_SCORPIO_COMMON_H

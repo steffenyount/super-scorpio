@@ -7,6 +7,7 @@ include(pico_sdk_import.cmake)
 project(super-scorpio C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+set(PICO_COPY_TO_RAM 1)
 
 set(SUPER_SCORPIO_PATH ${PROJECT_SOURCE_DIR})
 

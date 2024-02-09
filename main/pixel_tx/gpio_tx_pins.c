@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-#include "pixel_rx/pixel_rx.h"
-#include "pixel_tx/pixel_tx.h"
+#include "gpio_tx_pins.h"
+#include "pixel_tx.h"
 
-#include <stdio.h>
-#include "pico/multicore.h"
-#include "pico/stdlib.h"
+#include "hardware/gpio.h"
 
-int main() {
-    stdio_usb_init();
-    for (int ii = 7; ii > 0; ii--) {
-        printf("Starting Super Scorpio! %d\n", ii);
-        sleep_ms(1000);
+void __not_in_flash_func(init_gpio_tx_pins)() {
+    // Tell the gpio pins that PWM is in charge of their values.
+    gpio_set_function(SCORPIO_DEFAULT_WS2812_PIN, GPIO_FUNC_PWM);
+
+    for (int gpio_num = GPIO_TX_PINS_BEGIN; gpio_num < GPIO_TX_PINS_END; gpio_num++) {
+        gpio_set_function(gpio_num, GPIO_FUNC_PWM);
     }
-
-    multicore_launch_core1(core1_pixel_tx);
-    init_core0_pixel_tx();
-    core0_pixel_rx();
 }
