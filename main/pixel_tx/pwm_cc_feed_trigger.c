@@ -19,16 +19,17 @@
 
 #include "hardware/pwm.h"
 
+volatile bool __not_in_flash("super_scorpio") pwm_cc_feed_trigger_busy = false;
 
-static uint32_t __scratch_y("super_scorpio") __alignment(5) * feed_srcs_for_dma_pwm_cc_feed_director[8] = {
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_dests_for_dma_pwm_cc_feed_last
+static uint32_t __not_in_flash("super_scorpio") __alignment(5) * feed_srcs_for_dma_pwm_cc_feed_director[8] = {
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
+(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed_last
 };
 
 // dma_pma_cc_feed_trigger: dma_pwm_cc_feed_director__feed_sequence_srcs -> dma_pwm_cc_feed_director read_addr_trig

@@ -34,7 +34,8 @@
 #define DMA_PWM_CC_FEED_DIRECTOR_CHAN (6u)
 #define DMA_PWM_CC_FEED_TRIGGER_CHAN (7u)
 #define DMA_PWM_CC_FEED_TRIGGER_CHAN_MASK (1u << DMA_PWM_CC_FEED_TRIGGER_CHAN)
-
+#define DMA_PWM_CC_FEED_DISCARD_CHAN (8u)
+#define DMA_PWM_CC_FEED_DISCARD_CHAN_MASK (1u << DMA_PWM_CC_FEED_DISCARD_CHAN)
 
 typedef struct {
     uint8_t blue;
@@ -50,15 +51,17 @@ extern uint32_t tx_pixels_enabled;
 
 extern volatile bool tx_bytes_pending;
 
-__force_inline static bool get_tx_pixel_enabled(uint32_t tx_pixels_en, uint gpio_num) {
+extern const tx_pixel_t tx_pixel_off;
+
+static inline bool get_tx_pixel_enabled(uint32_t tx_pixels_en, uint gpio_num) {
     return (tx_pixels_en >> gpio_num) & 1u;
 }
 
-__force_inline static void set_tx_pixel_enabled(uint gpio_num) {
+static inline void set_tx_pixel_enabled(uint gpio_num) {
     tx_pixels_enabled |= (1u << gpio_num);
 }
 
-__force_inline static void set_tx_pixel_disabled(uint gpio_num) {
+static inline void set_tx_pixel_disabled(uint gpio_num) {
     tx_pixels_enabled &= ~(1u << gpio_num);
 }
 

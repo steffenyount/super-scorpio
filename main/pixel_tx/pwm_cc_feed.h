@@ -20,24 +20,33 @@
 #include "tick_log/tick_log.h"
 #include "pixel_tx.h"
 
-#define TX_BYTE_ON  (0xffu)
-#define TX_BYTE_OFF (0x00u)
+extern volatile bool pwm_cc_feeds_done;
 
-extern volatile bool pwm_cc_feed_done;
 
 void init_dma_pwm_cc_feed();
 
-
-__force_inline static void wait_for_pwm_cc_feeds_done() {
-    uint32_t pwm_cc_feed_count = 0u;
-    while(!pwm_cc_feed_done) {
-        if (pwm_cc_feed_count++ > 4096) break;
+static inline void wait_for_pwm_cc_feeds_done() {
+    uint32_t pwm_cc_feeds_count = 0u;
+    while(!pwm_cc_feeds_done) {
+        if (pwm_cc_feeds_count++ > 8192) break;
 //        tight_loop_contents();
     }
-    if (pwm_cc_feed_count > 1024) {
-        log_tick("pwm_cc_feed_count > 1024");
+    if (pwm_cc_feeds_count > 0u) {
+        if (pwm_cc_feeds_count > 8192) {
+            log_tick("pwm_cc_feeds_count > 8192");
+        } else {
+
+            log_tick("wait_for_pwm_cc_feeds done - after waiting");
+        }
+
+    } else {
+        log_tick("wait_for_pwm_cc_feeds done");
     }
-    pwm_cc_feed_done = false;
+
+//    while(!pwm_cc_feeds_done) {
+//        tight_loop_contents();
+//    }
+    pwm_cc_feeds_done = false;
 }
 
 

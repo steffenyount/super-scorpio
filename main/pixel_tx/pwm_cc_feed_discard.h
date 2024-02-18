@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef SUPER_SCORPIO_PWM_CC_FEED_DIRECTOR_H
-#define SUPER_SCORPIO_PWM_CC_FEED_DIRECTOR_H
+#ifndef SUPER_SCORPIO_PWM_CC_FEED_DISCARD_H
+#define SUPER_SCORPIO_PWM_CC_FEED_DISCARD_H
 
+#include "tick_log/tick_log.h"
 #include "pixel_tx.h"
 
 #include "hardware/dma.h"
 
-extern uint32_t * rxf_srcs_and_dests_for_dma_pwm_cc_feed[34];
-extern uint32_t * rxf_srcs_and_dests_for_dma_pwm_cc_feed_last[50];
+void init_dma_pwm_cc_feed_discard();
 
+static inline void trigger_pwm_cc_feed_discard() {
+    log_tick("trigger_pwm_cc_feed_discard()");
+    dma_hw->multi_channel_trigger = DMA_PWM_CC_FEED_DISCARD_CHAN_MASK;
+}
 
-void init_dma_pwm_cc_feed_director();
-
-#endif //SUPER_SCORPIO_PWM_CC_FEED_DIRECTOR_H
+#endif //SUPER_SCORPIO_PWM_CC_FEED_DISCARD_H

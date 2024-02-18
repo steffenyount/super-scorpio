@@ -15,15 +15,23 @@
 .program tx_bytes_to_pwm_cc
 
 .wrap_target
-    pull                ; load the next "pwm_slice_tx_bytes" entry from txf
-    in osr, 31
-    in null, 1          ; sending (tx_bytes << 1) for loop back + auto-push
+    irq wait 0 rel      ; "data ready" sync point: irq -> ON (rxf entries ready), irq -> OFF (txf entries ready)
+
+pull_no_wait:
+    pull noblock        ; load the next "pwm_slice_tx_bytes" entry from txf or from the queue (X) if txf is empty
     mov osr, ::osr      ; bit-reverse the value to make its top bits accessible for "IN" instructions
 
     ; assemble left 16-bit B-channel PWM CC value for tx_byte - 0 (0b000): off, 3 (0b011): low, 7 (0b111): high
     in null, 13         ; pad
     in osr, 1           ; bit from "tx_byte.curr_byte"
-    out null, 8         ; advance to "tx_byte.tx_enabled"
+
+    ; digress to advance the queue (Y to X) and then to save the shifted "pwm_slice_tx_bytes" entry into Y
+    out null, 1         ; advance the "pwm_slice_tx_bytes" entry for the next bit of the byte sequence (shift OSR >> 1)
+    mov x, y            ; advance the queue (Y to X)
+    mov y, ::osr        ; enqueue the shifted "pwm_slice_tx_bytes" value into Y (bit-reversed back)
+
+    ; resume the regular PWM CC value assembly steps
+    out null, 7         ; advance to "tx_byte.tx_enabled"
     in osr, 1           ; bit from "tx_byte.tx_enabled"
     in osr, 1           ; bit from "tx_byte.tx_enabled"
 
@@ -35,18 +43,39 @@
     out null, 8         ; advance to "tx_byte.tx_enabled"
     in osr, 1           ; bit from "tx_byte.tx_enabled"
     in osr, 1           ; bit from "tx_byte.tx_enabled" + auto-push
+
+    ; if less than 2 entries in RX FIFO
+    mov osr, x          ; stash temporarily
+    mov x, status       ; status: all-ones if RX FIFO level < 2
+    jmp !x restore_x_and_await_irq
+
+    ; then keep pulling and processing
+    mov x, osr          ; restore stashed value
+    jmp pull_no_wait    ; goto directly to pull
+
+    ; else signal rxf entries ready amd wait for next txf entries ready
+restore_x_and_await_irq:
+    mov x, osr          ; restore stashed value + wrap to irq + pull
 .wrap
 
 % c-sdk {
 #include "tick_log/tick_log.h"
+
+#define PIO_SM3_INTERRUPT_NUM (3u)
+#define PIO_SM3_INTERRUPT_MASK (1u << PIO_SM3_INTERRUPT_NUM)
+#define PIO_SM3_INTERRUPT_SOURCE_NUM (pis_interrupt3)
+#define PIO_SM3_INTERRUPT_SOURCE_MASK (1u << PIO_SM3_INTERRUPT_SOURCE_NUM)
+#define PIO_ALL_SM_INTERRUPTS_MASK (0x0fu)
 
 static inline void tx_bytes_to_pwm_cc_program_init(PIO pio, uint sm, uint offset) {
     pio_sm_config sm_cfg = tx_bytes_to_pwm_cc_program_get_default_config(offset);
 
     // OUT shifts to right, no autopull
     sm_config_set_out_shift(&sm_cfg, true, false, 32);
-    // IN shifts to left, with autopull
+    // IN shifts to left, with autopush
     sm_config_set_in_shift(&sm_cfg, false, true, 32);
+    // MOV status indicate if there's less than 2 entries in the rxf
+    sm_config_set_mov_status(&sm_cfg, STATUS_RX_LESSTHAN, 2u);
 
     pio_sm_init(pio, sm, offset, &sm_cfg);
     pio_sm_set_enabled(pio, sm, true);
@@ -63,23 +92,28 @@ static inline uint32_t pio1_sm3_get_rx_fifo_level() {
     return ((pio1->flevel & PIO_FLEVEL_RX3_BITS) >> PIO_FLEVEL_RX3_LSB);
 }
 
-static inline void wait_for_rxf_pwm_cc_data_ready() {
-    uint32_t pwm_cc_data_ready_count = 0u;
-    // ready when 2 loop back pwm_slice_tx_bytes and 2 pwm_cc entries present
-    while(pio1_sm3_get_rx_fifo_level() < 4) {
-        if (pwm_cc_data_ready_count++ > 1024) break;
+static inline void wait_for_pio_sm3_ready() {
+    uint32_t pio_sm3_ready_count = 0u;
+    // ready when rxf is empty and interrupt is set
+    while((pio1_sm3_get_rx_fifo_level() != 0) || !(pio1->irq & PIO_SM3_INTERRUPT_MASK)) {
+        if (pio_sm3_ready_count++ > 1024) break;
 //        tight_loop_contents();
     }
-    if (pwm_cc_data_ready_count > 0u) {
-        if (pwm_cc_data_ready_count > 1024) {
-            log_tick("pwm_cc_data_ready_count > 1024");
+    if (pio_sm3_ready_count > 0u) {
+        if (pio_sm3_ready_count > 1024) {
+            log_tick("pio_sm3_ready_count > 1024");
         } else {
 
-            log_tick("pwm_cc data ready - after waiting");
+            log_tick("pio sm3 ready - after waiting");
         }
 
     } else {
-        log_tick("pwm_cc data ready");
+        log_tick("pio sm3 ready");
     }
+}
+
+static inline void queue_up_next_pwm_cc_bit_values_in_rxf() {
+//    log_tick("queue_up_next_pwm_cc_bit_values_in_rxf()");
+    pio1->irq = PIO_ALL_SM_INTERRUPTS_MASK;
 }
 %}

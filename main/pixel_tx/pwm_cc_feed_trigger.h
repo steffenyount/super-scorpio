@@ -27,10 +27,17 @@
 
 void init_dma_pwm_cc_feed_trigger();
 
+//extern volatile bool pwm_cc_feed_trigger_busy;
 
-__force_inline static void trigger_pwm_cc_feeds() {
+static inline void trigger_pwm_cc_feeds() {
     log_tick("trigger_pwm_cc_feeds()");
+//    pwm_cc_feed_trigger_busy = true;
     dma_hw->multi_channel_trigger = DMA_PWM_CC_FEED_TRIGGER_CHAN_MASK;
 }
+
+//static inline bool pwm_cc_feed_trigger_is_busy() {
+//    return pwm_cc_feed_trigger_busy;
+//    //    return 0 != (dma_hw->ch[DMA_PWM_CC_FEED_TRIGGER_CHAN].al1_ctrl & DMA_CH0_CTRL_TRIG_BUSY_BITS);
+//}
 
 #endif //SUPER_SCORPIO_PWM_CC_FEED_TRIGGER_H

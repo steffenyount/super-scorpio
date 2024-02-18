@@ -31,7 +31,7 @@ extern uint32_t systick_start;
 extern volatile uint32_t tick_logs_count;
 extern log_t tick_logs[4096];
 
-__force_inline static void log_tick(char * msg) {
+static inline void log_tick(char * msg) {
     if (tick_logs_count > 300) return;
 
     log_t entry = {
@@ -39,15 +39,15 @@ __force_inline static void log_tick(char * msg) {
             .msg = msg,
     };
     tick_logs[tick_logs_count++] = entry;
-
 }
 
-__force_inline static void start_tick_logs() {
+static inline void start_tick_logs() {
     tick_logs_count = 0u;
+    systick_hw->cvr = 0u;
     systick_start = systick_hw->cvr;
 }
 
-__force_inline static void print_tick_logs() {
+static inline void print_tick_logs() {
     printf("logs[%d]\n", tick_logs_count);
     uint32_t systick_last = systick_start;
     for (int ii = 0; ii < tick_logs_count; ii++) {

@@ -26,4 +26,7 @@ extern uint16_t pwm_slice2_lower_cc_vals[PWM_SLICE_LOWER_CC_SAMPLES];
 
 void init_irq_handling();
 
+void init_core0_irq_handling();
+
+
 #endif //SUPER_SCORPIO_IRQ_HANDLING_H

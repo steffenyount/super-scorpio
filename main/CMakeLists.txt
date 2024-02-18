@@ -25,6 +25,8 @@ add_executable(main
         pixel_tx/gpio_tx_pins.c
         pixel_tx/pwm_tx_slices.h
         pixel_tx/pwm_tx_slices.c
+        pixel_tx/pwm_cc_feed_discard.h
+        pixel_tx/pwm_cc_feed_discard.c
 )
 
 pico_generate_pio_header(main ${CMAKE_CURRENT_LIST_DIR}/pixel_tx/tx_bytes_to_pwm_cc.pio)
