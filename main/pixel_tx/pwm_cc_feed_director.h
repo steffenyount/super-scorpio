@@ -21,8 +21,18 @@
 
 #include "hardware/dma.h"
 
-extern uint32_t * rxf_srcs_and_dests_for_dma_pwm_cc_feed[34];
-extern uint32_t * rxf_srcs_and_dests_for_dma_pwm_cc_feed_last[50];
+extern volatile uint8_t ** next_srcs_for_tx_bytes_director;
+
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7[20];
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit[34];
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__discard_tx_bytes_and_feed_pwm_cc_bit_0[34];
+
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__source_red_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[2][8];
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__source_blue_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[2][8];
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__source_green_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[2][8];
+extern uint32_t * trigger_termination_sequence_and_feed_pwm_cc_bit_0[2][8];
+extern uint32_t * srcs_and_dests_for_pwm_cc_feed_director__trigger_next_feed_or_termination_sequence_and_feed_pwm_cc_bit_0[2][8];
+
 
 
 void init_dma_pwm_cc_feed_director();

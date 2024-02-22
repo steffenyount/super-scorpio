@@ -19,39 +19,25 @@
 
 #include "common.h"
 
-#define GPIO_TX_PINS_BEGIN (8u)
-#define GPIO_TX_PINS_END (24u)
-#define GPIO_TX_PINS_MASK (0x00ffff00u)
-#define NUM_GPIO_TX_PINS (16u)
-
 #define PWM_SCORPIO_DEFAULT_WS2812_PIN_SLICE (2u)
 #define PWM_SCORPIO_DEFAULT_WS2812_PIN_SLICE_MASK (1u << PWM_SCORPIO_DEFAULT_WS2812_PIN_SLICE)
 
 #define DMA_TX_BYTES_FEED_CHAN (4u)
 #define DMA_TX_BYTES_FEED_CHAN_MASK (1u << DMA_TX_BYTES_FEED_CHAN)
-#define DMA_PWM_CC_FEED_CHAN (5u)
+#define DMA_TX_BYTES_FEED_DIRECTOR_CHAN (5u)
+#define DMA_TX_BYTES_FEED_DIRECTOR_CHAN_MASK (1u << DMA_TX_BYTES_FEED_DIRECTOR_CHAN)
+#define DMA_PWM_SLICE_TX_BYTES_FEED_CHAN (6u)
+#define DMA_PWM_SLICE_TX_BYTES_FEED_CHAN_MASK (1u << DMA_PWM_SLICE_TX_BYTES_FEED_CHAN)
+#define DMA_PWM_CC_FEED_CHAN (7u)
 #define DMA_PWM_CC_FEED_CHAN_MASK (1u << DMA_PWM_CC_FEED_CHAN)
-#define DMA_PWM_CC_FEED_DIRECTOR_CHAN (6u)
-#define DMA_PWM_CC_FEED_TRIGGER_CHAN (7u)
+#define DMA_PWM_CC_FEED_DIRECTOR_CHAN (8u)
+#define DMA_PWM_CC_FEED_TRIGGER_CHAN (9u)
 #define DMA_PWM_CC_FEED_TRIGGER_CHAN_MASK (1u << DMA_PWM_CC_FEED_TRIGGER_CHAN)
-#define DMA_PWM_CC_FEED_DISCARD_CHAN (8u)
+#define DMA_PWM_CC_FEED_DISCARD_CHAN (10u)
 #define DMA_PWM_CC_FEED_DISCARD_CHAN_MASK (1u << DMA_PWM_CC_FEED_DISCARD_CHAN)
 
-typedef struct {
-    uint8_t blue;
-    uint8_t red;
-    uint8_t green;
-    uint8_t reserved;
-} tx_pixel_t;
-
-// usage: tx_pixel_t tx_pixel = gpio_tx_pixels[gpio_num]
-extern tx_pixel_t * gpio_tx_pixels;
 
 extern uint32_t tx_pixels_enabled;
-
-extern volatile bool tx_bytes_pending;
-
-extern const tx_pixel_t tx_pixel_off;
 
 static inline bool get_tx_pixel_enabled(uint32_t tx_pixels_en, uint gpio_num) {
     return (tx_pixels_en >> gpio_num) & 1u;

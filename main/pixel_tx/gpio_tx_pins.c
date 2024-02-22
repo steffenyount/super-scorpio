@@ -15,7 +15,7 @@
  */
 
 #include "gpio_tx_pins.h"
-#include "pixel_tx.h"
+#include "common.h"
 
 #include "hardware/gpio.h"
 

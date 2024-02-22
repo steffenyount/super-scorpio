@@ -3,8 +3,6 @@ add_executable(main
         pixel_tx/pixel_tx.c
         pixel_rx/pixel_rx.c
         common.h
-        pixel_tx/tx_bytes_feed.h
-        pixel_tx/tx_bytes_feed.c
         tick_log/tick_log.h
         tick_log/tick_log.c
         pixel_tx/pwm_cc_feed.h
@@ -27,6 +25,14 @@ add_executable(main
         pixel_tx/pwm_tx_slices.c
         pixel_tx/pwm_cc_feed_discard.h
         pixel_tx/pwm_cc_feed_discard.c
+        pixel_tx/tx_bytes_feed_director.h
+        pixel_tx/tx_bytes_feed_director.c
+        pixel_tx/tx_bytes_feed.h
+        pixel_tx/tx_bytes_feed.c
+        pixel_tx/tx_bytes_buffer.h
+        pixel_tx/tx_bytes_buffer.c
+        pixel_tx/tx_pixels_buffer.h
+        pixel_tx/tx_pixels_buffer.c
 )
 
 pico_generate_pio_header(main ${CMAKE_CURRENT_LIST_DIR}/pixel_tx/tx_bytes_to_pwm_cc.pio)

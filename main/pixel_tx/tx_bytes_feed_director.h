@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef SUPER_SCORPIO_COMMON_H
-#define SUPER_SCORPIO_COMMON_H
+#ifndef SUPER_SCORPIO_TX_BYTES_FEED_DIRECTOR_H
+#define SUPER_SCORPIO_TX_BYTES_FEED_DIRECTOR_H
 
-#include "pico/platform.h"
+#include "pixel_tx.h"
 
-#define __alignment(size_bits) __attribute__((aligned(1u << size_bits)))
+extern const uint32_t tx_bytes_director_dma_channel_mask;
 
-#define GPIO_TX_PINS_BEGIN (8u)
-#define GPIO_TX_PINS_END (24u)
-#define GPIO_TX_PINS_MASK (0x00ffff00u)
-#define NUM_GPIO_TX_PINS (16u)
+extern uint8_t * srcs_for_tx_bytes_director__stage_green_tx_bytes[2][33];
+extern uint8_t * srcs_for_tx_bytes_director__stage_red_tx_bytes[2][33];
+extern uint8_t * srcs_for_tx_bytes_director__stage_blue_tx_bytes[2][33];
 
-#define SCORPIO_DEFAULT_WS2812_PIN (4u)
-#define NUM_PWM_SLICES_MASK ((1u << NUM_PWM_SLICES) - 1u)
+void init_dma_gpio_tx_bytes_feed_director();
 
-#endif //SUPER_SCORPIO_COMMON_H
+#endif //SUPER_SCORPIO_TX_BYTES_FEED_DIRECTOR_H

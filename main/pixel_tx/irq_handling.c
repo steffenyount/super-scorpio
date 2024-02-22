@@ -16,6 +16,7 @@
 
 #include "irq_handling.h"
 #include "tick_log/tick_log.h"
+#include "tx_pixels_buffer.h"
 #include "tx_bytes_feed.h"
 #include "tx_bytes_to_pwm_cc.pio.h"
 #include "pwm_cc_feed.h"

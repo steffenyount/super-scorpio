@@ -17,7 +17,10 @@
 #include "pixel_tx.h"
 #include "common.h"
 #include "tick_log/tick_log.h"
+#include "tx_pixels_buffer.h"
+#include "tx_bytes_buffer.h"
 #include "tx_bytes_feed.h"
+#include "tx_bytes_feed_director.h"
 #include "tx_bytes_to_pwm_cc.pio.h"
 #include "pwm_cc_feed.h"
 #include "pwm_cc_feed_director.h"
@@ -41,25 +44,8 @@
 #define printbits_32(x) printbits_n(x,32)
 #define printbits_16(x) printbits_n(x,16)
 
-// 16 GPIO_TX_PINS x 4 bytes (curr & enable) = 64
-#define TX_PIXELS_ALIGN_SIZE_BITS (6u)
-#define PIXELS_PER_FRAME (512u)
-
-volatile bool __scratch_y("super_scorpio") tx_bytes_pending = false;
-
-static tx_pixel_t __scratch_y("super_scorpio") __alignment(TX_PIXELS_ALIGN_SIZE_BITS) tx_pixels[NUM_GPIO_TX_PINS];
-tx_pixel_t __scratch_y("super_scorpio") * gpio_tx_pixels = ((tx_pixel_t *) &tx_pixels[0]) - GPIO_TX_PINS_BEGIN;
 
 uint32_t __scratch_y("super_scorpio") tx_pixels_enabled = 0u;
-
-const tx_pixel_t tx_pixel_off = {
-        .blue = 0u,
-        .red = 0u,
-        .green = 0u,
-};
-
-//static uint32_t __scratch_y("super_scorpio") __alignment(5) tx_bytesdump[NUM_PWM_SLICES];
-
 
 static inline bool advance_tx_pixels() {
     log_tick("advance_tx_pixels()");
@@ -76,7 +62,7 @@ static inline bool advance_tx_pixels() {
                     new_tx_feeds_status |= gpio_num_mask;
 
                     // zero out/disable the tx_pixel values
-                    gpio_tx_pixels[gpio_num] = tx_pixel_off;
+                    next_gpio_tx_pixels[gpio_num] = tx_pixel_off;
                     set_tx_pixel_disabled(gpio_num);
 
                     // close frame
@@ -105,15 +91,15 @@ static inline bool advance_tx_pixels() {
 
 
 static inline uint8_t get_curr_byte_green(uint gpio_num) {
-    return gpio_tx_pixels[gpio_num].green;
+    return curr_gpio_tx_pixels[gpio_num].green;
 }
 
 static inline uint8_t get_curr_byte_red(uint gpio_num) {
-    return gpio_tx_pixels[gpio_num].red;
+    return curr_gpio_tx_pixels[gpio_num].red;
 }
 
 static inline uint8_t get_curr_byte_blue(uint gpio_num) {
-    return gpio_tx_pixels[gpio_num].blue;
+    return curr_gpio_tx_pixels[gpio_num].blue;
 }
 
 static inline tx_byte_t tx_byte_on(uint8_t curr_byte) {
@@ -420,7 +406,8 @@ static inline bool advance_tx_bytes() {
 }
 
 static inline void init_dma_channels_for_tx_byte_send() {
-    init_dma_tx_bytes_feed();
+    init_dma_gpio_tx_bytes_feed();
+    init_dma_gpio_tx_bytes_feed_director();
     init_dma_pwm_cc_feed();
     init_dma_pwm_cc_feed_director();
     init_dma_pwm_cc_feed_trigger();
@@ -484,7 +471,7 @@ void __not_in_flash_func(send_frame)() {
     pwm_set_irq_enabled(PWM_SCORPIO_DEFAULT_WS2812_PIN_SLICE, true);
 
     // send the initial tx_bytes
-    trigger_tx_bytes_feed();
+//    trigger_pwm_slice_tx_bytes_feed();
     wait_for_rxf_pwm_cc_data_ready();
 
     // reset the DREQ counter for the DMA_PWM_CC_FEED_TRIGGER_CHAN

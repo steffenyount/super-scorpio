@@ -25,6 +25,10 @@
 #define PWM_SENTINEL_SLICE (4u)
 #define PWM_SENTINEL_SLICE_MASK (1u << PWM_SENTINEL_SLICE)
 
+extern const uint32_t pwm_cc_trigger_dma_channel_mask;
+
+extern uint32_t * srcs_for_pwm_cc_feed_trigger__feed_8_pwm_cc_bits[8];
+
 void init_dma_pwm_cc_feed_trigger();
 
 //extern volatile bool pwm_cc_feed_trigger_busy;

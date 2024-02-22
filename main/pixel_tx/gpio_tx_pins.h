@@ -17,7 +17,6 @@
 #ifndef SUPER_SCORPIO_GPIO_TX_PINS_H
 #define SUPER_SCORPIO_GPIO_TX_PINS_H
 
-
 void init_gpio_tx_pins();
 
 #endif //SUPER_SCORPIO_GPIO_TX_PINS_H

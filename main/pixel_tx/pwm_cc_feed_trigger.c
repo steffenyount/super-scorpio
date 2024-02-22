@@ -19,18 +19,73 @@
 
 #include "hardware/pwm.h"
 
+const uint32_t pwm_cc_trigger_dma_channel_mask = DMA_PWM_CC_FEED_TRIGGER_CHAN_MASK;
+
 volatile bool __not_in_flash("super_scorpio") pwm_cc_feed_trigger_busy = false;
 
-static uint32_t __not_in_flash("super_scorpio") __alignment(5) * feed_srcs_for_dma_pwm_cc_feed_director[8] = {
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed,
-(uint32_t *)rxf_srcs_and_dests_for_dma_pwm_cc_feed_last
-};
+uint32_t __not_in_flash("super_scorpio") * srcs_for_pwm_cc_feed_trigger__feed_8_green_pwm_cc_bits[2][8] = {
+{
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__source_red_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[0],
+}, {
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__source_red_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[1],
+}};
+
+uint32_t __not_in_flash("super_scorpio") * srcs_for_pwm_cc_feed_trigger__feed_8_red_pwm_cc_bits[2][8] = {
+{
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__source_blue_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[0],
+}, {
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__source_blue_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[1],
+
+}};
+
+uint32_t __not_in_flash("super_scorpio") * srcs_for_pwm_cc_feed_trigger__feed_8_blue_pwm_cc_bits[2][8] = {
+{
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__source_green_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[1],
+}, {
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__load_tx_bytes_stage_next_tx_bytes_and_feed_pwm_cc_bit_7,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__loop_back_tx_bytes_and_feed_pwm_cc_bit,
+(uint32_t *)srcs_and_dests_for_pwm_cc_feed_director__source_green_tx_bytes_trigger_next_feed_and_feed_pwm_cc_bit_0[0],
+}};
 
 // dma_pma_cc_feed_trigger: dma_pwm_cc_feed_director__feed_sequence_srcs -> dma_pwm_cc_feed_director read_addr_trig
 void __not_in_flash_func(init_dma_pwm_cc_feed_trigger)() {
@@ -50,7 +105,7 @@ void __not_in_flash_func(init_dma_pwm_cc_feed_trigger)() {
     channel_config_set_high_priority(&dma_channel_ctrl, false);
     dma_channel_set_config(DMA_PWM_CC_FEED_TRIGGER_CHAN, &dma_channel_ctrl, false);
 
-    dma_channel_set_read_addr(DMA_PWM_CC_FEED_TRIGGER_CHAN, feed_srcs_for_dma_pwm_cc_feed_director, false);
+    dma_channel_set_read_addr(DMA_PWM_CC_FEED_TRIGGER_CHAN, srcs_for_pwm_cc_feed_trigger__feed_8_pwm_cc_bits, false);
     dma_channel_set_write_addr(DMA_PWM_CC_FEED_TRIGGER_CHAN, &dma_hw->ch[DMA_PWM_CC_FEED_DIRECTOR_CHAN].al3_read_addr_trig, false);
     dma_channel_set_trans_count(DMA_PWM_CC_FEED_TRIGGER_CHAN, 8, false);
 }
