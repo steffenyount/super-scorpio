@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-#include "pixel_feeds.h"
+#include "channel_control.h"
+#include "pwm_slices.h"
+#include "pwm_feeds.h"
 
-void init_pixel_feeds() {
-    set_on_off_feed_chain(16, (uint8_t [16]) {8,9,10,11,12,13,14,15,16,17,18,19,23,22,21,20}, 0);
-//    set_rx_channel_feed_chain(12, (uint8_t [12]) {8,9,10,11,12,13,14,15,16,17,18,19}, 0, 0);
-//    set_rx_channel_feed_chain(4, (uint8_t [4]) {23,22,21,20}, 3, 0);
+void set_gpio_channel_pixels_on_for_byte_range(uint8_t gpio_num, uint32_t start, uint32_t end) {
+    start_pwm_slice_for_gpio(gpio_num);
+    feed_high_bits_to_pwm_slice_for_byte_range(gpio_num, start, end);
+    pwm_slice_wait_for_shutdown_blocking(active_pwm_slice_num);
 }
 
+void init_pixel_control() {
+    init_pwm_config();
+}

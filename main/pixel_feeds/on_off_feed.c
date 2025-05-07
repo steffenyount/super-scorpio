@@ -15,88 +15,112 @@
  */
 
 #include "on_off_feed.h"
-#include "pixel_tx/tx_pixels_buffer.h"
-#include "pixel_tx/pixel_tx.h"
+#include "pixel_channels/tx_channels.h"
+#include "pixel_tx_loop/pixel_tx_loop.h"
+#include "pixel_tx_loop/tx_bytes_feed.h"
+#include "pixel_channels/rx_channels.h"
 
-bool __scratch_y("super_scorpio") on_off_feed_value = true;
-
-uint32_t __scratch_x("super_scorpio") src_pixel = 0u;
-
-static void __not_in_flash_func(on_off_feed__open_frame)(tx_feed_t * this, uint8_t gpio_num) {
-}
-
-static bool __not_in_flash_func(on_off_feed__advance_pixel)(tx_feed_t * this, uint8_t gpio_num) {
-    if (curr_pixel < 1) {
-        uint16_t pos = (curr_frame >> 1) + curr_pixel;
-        uint16_t idx = pos & 3u;
-        uint8_t bit = 1u << ((pos >> 2) & 7u);
-        if (0u == idx) {
-            next_gpio_tx_pixels[gpio_num] = (tx_pixel_t) {
-                    .blue = on_off_feed_value ? 0x66 : 0x00,
-                    .red = on_off_feed_value ? 0x66 : 0x00,
-                    .green = on_off_feed_value ? 0x66 : 0x00,
-            };
-            set_tx_pixel_enabled(gpio_num);
-
-            if (on_off_feed_value && 0 == curr_pixel) {
-                src_pixel = ((uint32_t *) next_gpio_tx_pixels)[gpio_num];
-            }
-
-            return true;
-
-        } else if (1u == idx) {
-            next_gpio_tx_pixels[gpio_num] = (tx_pixel_t) {
-                    .blue = 0x00,
-                    .red = 0x00,
-                    .green = on_off_feed_value ? bit : 0x00,
-            };
-            set_tx_pixel_enabled(gpio_num);
-
-            if (on_off_feed_value && 0 == curr_pixel) {
-                src_pixel = ((uint32_t *) next_gpio_tx_pixels)[gpio_num];
-            }
-
-            return true;
-
-        } else if (2u == idx) {
-            next_gpio_tx_pixels[gpio_num] = (tx_pixel_t) {
-                    .blue = 0x00,
-                    .red = on_off_feed_value ? bit : 0x00,
-                    .green = 0x00,
-            };
-            set_tx_pixel_enabled(gpio_num);
-
-            if (on_off_feed_value && 0 == curr_pixel) {
-                src_pixel = ((uint32_t *) next_gpio_tx_pixels)[gpio_num];
-            }
-
-            return true;
-
-        } else /* if (3u == idx) */ {
-            next_gpio_tx_pixels[gpio_num]  = (tx_pixel_t) {
-                    .blue = on_off_feed_value ? bit : 0x00,
-                    .red = 0x00,
-                    .green = 0x00,
-            };
-            set_tx_pixel_enabled(gpio_num);
-
-            if (on_off_feed_value && 0 == curr_pixel) {
-                src_pixel = ((uint32_t *) next_gpio_tx_pixels)[gpio_num];
-            }
-
-            return true;
-        }
-    } else {
-        return false;
-    }
-}
-
-static void __not_in_flash_func(on_off_feed__close_frame)(tx_feed_t * this, uint8_t gpio_num) {
+static void on_off_feed__open_frame(pixel_feed_t * const this_feed) {
     // no-op
 }
 
-tx_feed_t __scratch_y("super_scorpio") on_off_feed = {
-        .open_frame = on_off_feed__open_frame,
-        .advance_pixel = on_off_feed__advance_pixel,
-        .close_frame = on_off_feed__close_frame
-};
+static void on_off_feed__feed_pixel(pixel_feed_t * const this_feed, rgbw_pixel_t * const rgbw_dest) {
+    on_off_feed_t * const this = &this_feed->on_off;
+    uint16_t curr_pixel = this->tx_chan->chain_index;
+    uint32_t curr_frame = this->chain_root->tx_status.frames_fed;
+
+    // pattern repeats every 2^6 bits => every 64 pixels
+    uint16_t pos = curr_frame + curr_pixel;
+    bool on_off_feed_value = !(pos & 0x20u);  // !(bit 5)
+    uint16_t idx = (pos >> 3) & 0x3u;         // bits 3..4
+    uint8_t value = 1u << (pos & 0x07u);      // bits 0..2
+    if (0u == idx) {
+        *rgbw_dest = (rgbw_pixel_t) {
+                .blue = on_off_feed_value ? value : 0x00,
+                .red = on_off_feed_value ? value : 0x00,
+                .green = on_off_feed_value ? value : 0x00,
+                .white = on_off_feed_value ? value : 0x00,
+        };
+
+        if (on_off_feed_value && this->tx_chan->chain_offset == curr_pixel) {
+            this->src_pixel.uint32 = rgbw_dest->uint32;
+        }
+
+    } else if (1u == idx) {
+        *rgbw_dest = (rgbw_pixel_t) {
+                .blue = 0x00,
+                .red = 0x00,
+                .green = on_off_feed_value ? value : 0x00,
+                .white = 0x00,
+        };
+
+        if (on_off_feed_value && this->tx_chan->chain_offset == curr_pixel) {
+            this->src_pixel.uint32 = rgbw_dest->uint32;
+        }
+
+    } else if (2u == idx) {
+        *rgbw_dest = (rgbw_pixel_t) {
+                .blue = 0x00,
+                .red = on_off_feed_value ? value : 0x00,
+                .green = 0x00,
+                .white = 0x00,
+        };
+
+        if (on_off_feed_value && this->tx_chan->chain_offset == curr_pixel) {
+            this->src_pixel.uint32 = rgbw_dest->uint32;
+        }
+
+    } else /* if (3u == idx) */ {
+        *rgbw_dest = (rgbw_pixel_t) {
+                .blue = on_off_feed_value ? value : 0x00,
+                .red = 0x00,
+                .green = 0x00,
+                .white = 0x00,
+        };
+
+        if (on_off_feed_value && this->tx_chan->chain_offset == curr_pixel) {
+            this->src_pixel.uint32 = rgbw_dest->uint32;
+        }
+    }
+}
+
+static void on_off_feed__close_frame(pixel_feed_t * const this_feed) {
+    // no-op
+}
+
+static inline void set_on_off_feed_with_chain_root(tx_channel_t * const tx_chan, tx_channel_t * const chain_root) {
+    tx_chan->root_feed.on_off = (on_off_feed_t) {
+            .open_frame = on_off_feed__open_frame,
+            .feed_pixel = on_off_feed__feed_pixel,
+            .close_frame = on_off_feed__close_frame,
+            .tx_chan = tx_chan,
+            .chain_root = chain_root,
+    };
+
+    // ensure rx_chan triggers are disabled
+    for (uint32_t rx_channel_num = 0u; rx_channel_num < NUM_RX_PINS; rx_channel_num++) {
+        clear_bits(&rx_channels[rx_channel_num].tx_feed_triggers, tx_chan->gpio_mask);
+    }
+    // enable bytes_fed trigger for every 0.1 second
+    tx_chan->bytes_fed_ready_interval = 50000u; //10000u ;
+}
+
+void set_on_off_feed_chain(uint8_t count, const uint8_t tx_gpio_nums[count], uint16_t chain_offset) {
+    tx_channel_t * chain_root = NULL;
+
+    for (uint8_t ii = 0u; ii < count; ii++) {
+        tx_channel_t * const tx_chan = &gpio_tx_channels[tx_gpio_nums[ii]];
+        if (tx_chan->pixel_count) {
+            if (!chain_root) {
+                chain_root = tx_chan;
+            }
+            set_on_off_feed_with_chain_root(tx_chan, chain_root);
+
+            tx_chan->chain_offset = chain_offset;
+            chain_offset += tx_chan->pixel_count;
+
+        } else {
+            set_empty_feed(tx_gpio_nums[ii]);
+        }
+    }
+}

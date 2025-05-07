@@ -1,0 +1,102 @@
+;  Copyright (C) 2024 Steffen Yount
+;
+;  Licensed under the Apache License, Version 2.0 (the "License");
+;  you may not use this file except in compliance with the License.
+;  You may obtain a copy of the License at
+;
+;  http://www.apache.org/licenses/LICENSE-2.0
+;
+;  Unless required by applicable law or agreed to in writing, software
+;  distributed under the License is distributed on an "AS IS" BASIS,
+;  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;  See the License for the specific language governing permissions and
+;  limitations under the License.
+
+.program gpio_pins_to_rx_bytes
+.origin 0
+
+; compose our countdown targets into reg x and y, for the pin quiet-period and the pixel reset-period respectively
+    set x, 0x2           ; pin quiet-period timer for (625 * 2) ticks (10us)
+    in x, 32
+    set x, 0x7
+    in x, 4
+    set x, 0x5
+    in x, 4
+    mov x, isr           ; 625 = 0x0275
+
+    set y, 0x8           ; pixel reset-period timer for (2250 * 2) ticks (36us)
+    in y, 32
+    set y, 0xc
+    in y, 4
+    set y, 0xa
+    in y, 4
+    mov y, isr           ; 2250 = 0x08ca
+; Specs indicate a minimum inbound reset-period of 50us between frames. We'll assume a reset-period after 36us of
+; inactivity, leaving 4us for IRQ/DMA reset handling and another 10us for quiet time between frames.
+
+.wrap_target
+    mov isr, null        ; discard isr contents and reset its counter to zero
+
+; ensure there's been at least 1 bytes worth (~10us) of inactivity on the pin before we start collecting data
+    mov osr, x           ; stash a copy of the pin quiet-period countdown target
+pin_is_busy:
+    mov x, osr           ; reload the pin quiet-period countdown target
+    wait 0 pin 0         ; get to known state: starting with pin 0 low
+awaiting_activity:
+    jmp pin pin_is_busy  ; if EXECCTRL_JMP_PIN is high
+    jmp x-- awaiting_activity
+    mov x, osr           ; countdown completed, restore the pin quiet-period countdown target into reg x
+
+; pin is inactive, start collecting data
+awaiting_first_bit:
+    mov osr, y           ; stash a copy of the pixel reset-period countdown target
+    wait 1 pin 0         ; wait for pin 0 (rel to PINCTRL_IN_BASE) to go high
+pin_is_high:
+    nop             [30] ; wait ~63 ticks (504ns) then see if this is an ON or OFF bit
+    mov y, osr      [30] ; reload the pixel reset-period countdown target
+    in pins, 1           ; read datum from pin 0 (rel to PINCTRL_IN_BASE)
+    push iffull noblock  ; push 1-byte at a time: SHIFTCTRL_PUSH_THRESH = 8 bits
+    wait 0 pin 0         ; wait for pin 0 (rel to PINCTRL_IN_BASE) to go low
+awaiting_next_bit:
+    jmp pin pin_is_high  ; if EXECCTRL_JMP_PIN is high
+    jmp y-- awaiting_next_bit
+    mov y, osr           ; countdown completed, restore the pixel reset-period countdown target into reg y
+
+; handle pixel reset timeout
+    irq wait 0 rel       ; notify the irq handler that we've collected our last byte for this frame and wait
+.wrap
+
+% c-sdk {
+
+static inline void gpio_pins_to_rx_bytes_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    // rx GPIO PIN
+    gpio_set_function_no_side_effects(pin, GPIO_FUNC_PIO0);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+
+    // init sm_cfg values
+    pio_sm_config sm_cfg = gpio_pins_to_rx_bytes_program_get_default_config(offset);
+
+    // make RXF 8 words deep
+    sm_config_set_fifo_join(&sm_cfg, PIO_FIFO_JOIN_RX);
+    // OUT shifts to left, no autopull
+    sm_config_set_out_shift(&sm_cfg, false, false, 32u);
+    // IN shifts to left, no autopush
+    sm_config_set_in_shift(&sm_cfg, false, false, 8u);
+    sm_config_set_in_pins(&sm_cfg, pin);
+    sm_config_set_jmp_pin(&sm_cfg, pin);
+
+    pio_sm_init(pio, sm, offset, &sm_cfg);
+
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+static inline void init_pio0_for_gpio_pins_to_rx_bytes_programs() {
+    uint offset = pio_add_program(pio0, &gpio_pins_to_rx_bytes_program);
+
+    gpio_pins_to_rx_bytes_program_init(pio0, 0u, offset, 5u);
+    gpio_pins_to_rx_bytes_program_init(pio0, 1u, offset, 6u);
+    gpio_pins_to_rx_bytes_program_init(pio0, 2u, offset, 24u);
+    gpio_pins_to_rx_bytes_program_init(pio0, 3u, offset, 25u);
+}
+
+%}

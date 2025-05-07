@@ -15,21 +15,38 @@
  */
 
 #include "empty_feed.h"
+#include "pixel_channels/tx_channels.h"
+#include "pixel_channels/rx_channels.h"
 
 
-static void __not_in_flash_func(empty_feed__open_frame)(tx_feed_t * this, uint8_t gpio_num) {
+static void empty_feed__open_frame(pixel_feed_t * const this_feed) {
 }
 
-static bool __not_in_flash_func(empty_feed__advance_pixel)(tx_feed_t * this, uint8_t gpio_num) {
-    return false;
+static void empty_feed__feed_pixel(pixel_feed_t * const this_feed, rgbw_pixel_t * const rgbw_dest) {
+
 }
 
-static void __not_in_flash_func(empty_feed__close_frame)(tx_feed_t * this, uint8_t gpio_num) {
+static void empty_feed__close_frame(pixel_feed_t * const this_feed) {
     // no-op
 }
 
-tx_feed_t __scratch_y("super_scorpio") empty_feed = {
+empty_feed_t empty_feed = {
         .open_frame = empty_feed__open_frame,
-        .advance_pixel = empty_feed__advance_pixel,
-        .close_frame = empty_feed__close_frame
+        .feed_pixel = empty_feed__feed_pixel,
+        .close_frame = empty_feed__close_frame,
+        .tx_chan = NULL,
+        .chain_root = NULL,
 };
+
+void set_empty_feed(uint8_t gpio_num) {
+    tx_channel_t * const tx_chan = &gpio_tx_channels[gpio_num];
+
+    tx_chan->root_feed.empty = empty_feed;
+
+    // ensure rx_chan triggers are disabled
+    for (uint32_t rx_channel_num = 0u; rx_channel_num < NUM_RX_PINS; rx_channel_num++) {
+        clear_bits(&rx_channels[rx_channel_num].tx_feed_triggers, tx_chan->gpio_mask);
+    }
+    // ensure bytes_fed trigger is disabled
+    tx_chan->bytes_fed_ready_interval = 0u;
+}

@@ -20,40 +20,163 @@
 #include "pico/stdlib.h"
 
 #include <stdio.h>
+#include <hardware/sync.h>
 #include "hardware/structs/systick.h"
+
+#define TICK_LOG_BUFFER_SIZE_BITS (8u)
+#define TICK_LOG_BUFFER_SIZE (1u << TICK_LOG_BUFFER_SIZE_BITS)
+#define TICK_LOG_BUFFER_SIZE_BIT_MASK (TICK_LOG_BUFFER_SIZE - 1u)
+
+#define TICK_LOG_MSG_LIMIT (250u)
 
 typedef struct {
     uint32_t systick;
     char * msg;
+    union {
+        uint32_t value;
+        char * string;
+    };
 } log_t;
 
-extern uint32_t systick_start;
-extern volatile uint32_t tick_logs_count;
-extern log_t tick_logs[4096];
+extern volatile uint32_t core0_tick_logs_count;
+extern volatile uint32_t core1_tick_logs_count;
 
-static inline void log_tick(char * msg) {
-    if (tick_logs_count > 300) return;
+#ifdef TICK_LOG_MSG_LIMIT
+extern volatile uint32_t core0_tick_logs_msg_limit;
+extern volatile uint32_t core1_tick_logs_msg_limit;
+#endif
 
-    log_t entry = {
-            .systick = systick_hw->cvr,
+extern log_t core0_tick_logs[TICK_LOG_BUFFER_SIZE];
+extern log_t core1_tick_logs[TICK_LOG_BUFFER_SIZE];
+
+static inline void reset_core0_tick_logs_msg_limit() {
+#ifdef TICK_LOG_MSG_LIMIT
+    core0_tick_logs_msg_limit = (core0_tick_logs_count + TICK_LOG_MSG_LIMIT) & TICK_LOG_BUFFER_SIZE_BIT_MASK;
+#endif
+}
+
+static inline void reset_core1_tick_logs_msg_limit() {
+#ifdef TICK_LOG_MSG_LIMIT
+    core1_tick_logs_msg_limit = (core1_tick_logs_count + TICK_LOG_MSG_LIMIT) & TICK_LOG_BUFFER_SIZE_BIT_MASK;
+#endif
+}
+
+static inline uint32_t get_and_increment_core0_tick_logs_count() {
+    uint32_t log_idx;
+
+// make this operation atomic?
+//    uint32_t saved_irqs = save_and_disable_interrupts();
+    core0_tick_logs_count = ((log_idx = core0_tick_logs_count) + 1u) & TICK_LOG_BUFFER_SIZE_BIT_MASK;
+//    restore_interrupts(saved_irqs);
+
+    return log_idx;
+}
+
+static inline uint32_t get_and_increment_core1_tick_logs_count() {
+    uint32_t log_idx;
+
+// make this operation atomic?
+//    uint32_t saved_irqs = save_and_disable_interrupts();
+    core1_tick_logs_count = ((log_idx = core1_tick_logs_count) + 1u) & TICK_LOG_BUFFER_SIZE_BIT_MASK;
+//    restore_interrupts(saved_irqs);
+
+    return log_idx;
+}
+
+static inline void core0_log_tick_with_string(char * msg, char * string) {
+#ifdef TICK_LOG_MSG_LIMIT
+    if (core0_tick_logs_count == core0_tick_logs_msg_limit) return;
+#endif
+
+    uint32_t systick = systick_hw->cvr;
+
+    core0_tick_logs[get_and_increment_core0_tick_logs_count()] = (log_t) {
+            .systick = systick,
             .msg = msg,
+            .string = string,
     };
-    tick_logs[tick_logs_count++] = entry;
 }
 
-static inline void start_tick_logs() {
-    tick_logs_count = 0u;
-    systick_hw->cvr = 0u;
-    systick_start = systick_hw->cvr;
+
+static inline void core0_log_tick_with_value(char * msg, uint32_t value) {
+#ifdef TICK_LOG_MSG_LIMIT
+    if (core0_tick_logs_count == core0_tick_logs_msg_limit) return;
+#endif
+
+    uint32_t systick = systick_hw->cvr;
+
+    core0_tick_logs[get_and_increment_core0_tick_logs_count()] = (log_t) {
+            .systick = systick,
+            .msg = msg,
+            .value = value,
+    };
 }
 
-static inline void print_tick_logs() {
-    printf("logs[%d]\n", tick_logs_count);
-    uint32_t systick_last = systick_start;
-    for (int ii = 0; ii < tick_logs_count; ii++) {
-        printf("[%4d] %6d %6d: %s\n", ii, systick_start - tick_logs[ii].systick, systick_last - tick_logs[ii].systick, tick_logs[ii].msg);
-        systick_last = tick_logs[ii].systick;
+static inline void core0_log_tick(char * msg) {
+    core0_log_tick_with_string(msg, NULL);
+}
+
+static inline void core1_log_tick_with_string(char * msg, char * string) {
+#ifdef TICK_LOG_MSG_LIMIT
+    if (core1_tick_logs_count == core1_tick_logs_msg_limit) return;
+#endif
+
+    uint32_t systick = systick_hw->cvr;
+
+    core1_tick_logs[get_and_increment_core1_tick_logs_count()] = (log_t) {
+            .systick = systick,
+            .msg = msg,
+            .string = string,
+    };
+}
+
+static inline void core1_log_tick_with_value(char * msg, uint32_t value) {
+#ifdef TICK_LOG_MSG_LIMIT
+    if (core1_tick_logs_count == core1_tick_logs_msg_limit) return;
+#endif
+
+    uint32_t systick = systick_hw->cvr;
+
+    core1_tick_logs[get_and_increment_core1_tick_logs_count()] = (log_t) {
+            .systick = systick,
+            .msg = msg,
+            .value = value,
+    };
+}
+
+static inline void core1_log_tick(char * msg) {
+    core1_log_tick_with_string(msg, NULL);
+}
+
+
+static inline void log_tick_with_string(char * msg, char * string) {
+    if (sio_hw->cpuid) {
+        core1_log_tick_with_string(msg, string);
+
+    } else {
+        core0_log_tick_with_string(msg, string);
     }
 }
+
+static inline void log_tick_with_value(char * msg, uint32_t uint32) {
+    if (sio_hw->cpuid) {
+        core1_log_tick_with_value(msg, uint32);
+
+    } else {
+        core0_log_tick_with_value(msg, uint32);
+    }
+}
+
+static inline void log_tick(char * msg) {
+    if (sio_hw->cpuid) {
+        core1_log_tick(msg);
+
+    } else {
+        core0_log_tick(msg);
+    }
+}
+
+void print_tick_logs();
+
 
 #endif //SUPER_SCORPIO_TICK_LOG_H

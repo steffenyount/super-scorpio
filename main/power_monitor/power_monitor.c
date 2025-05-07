@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "power_monitor.h"
+#include "power_monitor_feed.h"
+#include "power_monitor_adc.h"
 
-#include "pixel_feeds.h"
-
-void init_pixel_feeds() {
-    set_on_off_feed_chain(16, (uint8_t [16]) {8,9,10,11,12,13,14,15,16,17,18,19,23,22,21,20}, 0);
-//    set_rx_channel_feed_chain(12, (uint8_t [12]) {8,9,10,11,12,13,14,15,16,17,18,19}, 0, 0);
-//    set_rx_channel_feed_chain(4, (uint8_t [4]) {23,22,21,20}, 3, 0);
+void start_power_monitor() {
+    start_power_monitor_feed();
+    start_power_monitor_adc();
 }
 
+void stop_power_monitor() {
+    stop_power_monitor_feed();
+    stop_power_monitor_adc();
+}

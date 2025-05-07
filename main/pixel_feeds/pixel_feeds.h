@@ -17,23 +17,21 @@
 #ifndef SUPER_SCORPIO_PIXEL_FEEDS_H
 #define SUPER_SCORPIO_PIXEL_FEEDS_H
 
+#include "pixel_feed_base.h"
+#include "empty_feed.h"
+#include "on_off_feed.h"
+#include "rx_channel_feed.h"
+
 #include "hardware/sync.h"
 
-typedef struct tx_feed_t {
-    void (*open_frame)(struct tx_feed_t * this, uint8_t gpio_num);
-    bool (*advance_pixel)(struct tx_feed_t * this, uint8_t gpio_num);
-    void (*close_frame)(struct tx_feed_t * this, uint8_t gpio_num);
-} tx_feed_t;
+typedef union pixel_feed {
+    pixel_feed_base_t;
+    empty_feed_t empty;
+    on_off_feed_t on_off;
+    rx_channel_feed_t rx_channel;
+} pixel_feed_t;
 
-extern spin_lock_t * tx_feeds_lock;
-
-// usage: gpio_tx_feeds[gpio_num]->advance_pixel(gpio_tx_feeds[gpio_num])
-extern tx_feed_t ** gpio_tx_feeds;
-
-extern uint16_t curr_frame;
-extern uint16_t curr_pixel;
-
-void init_tx_feeds();
+void init_pixel_feeds();
 
 
 #endif //SUPER_SCORPIO_PIXEL_FEEDS_H

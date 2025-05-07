@@ -14,11 +14,19 @@
  * limitations under the License.
  */
 
-#include "pixel_feeds.h"
+#include "reverse_layout.h"
+#include "pixel_channels/tx_channels.h"
 
-void init_pixel_feeds() {
-    set_on_off_feed_chain(16, (uint8_t [16]) {8,9,10,11,12,13,14,15,16,17,18,19,23,22,21,20}, 0);
-//    set_rx_channel_feed_chain(12, (uint8_t [12]) {8,9,10,11,12,13,14,15,16,17,18,19}, 0, 0);
-//    set_rx_channel_feed_chain(4, (uint8_t [4]) {23,22,21,20}, 3, 0);
+
+static void reverse_layout__set_chain_index(const uint8_t tx_channel_num) {
+    tx_channels[tx_channel_num].chain_index = tx_channels[tx_channel_num].chain_offset +
+            ((tx_channels[tx_channel_num].pixel_count - 1) - tx_channels[tx_channel_num].tx_status.pixels_fed);
 }
 
+channel_layout_t reverse_layout = {
+        .set_chain_index = reverse_layout__set_chain_index,
+};
+
+void set_reverse_layout(uint8_t tx_gpio_num) {
+    gpio_tx_channels[tx_gpio_num].layout = reverse_layout;
+}

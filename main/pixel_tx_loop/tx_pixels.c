@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-#include "pixel_feeds.h"
+#include "tx_pixels.h"
 
-void init_pixel_feeds() {
-    set_on_off_feed_chain(16, (uint8_t [16]) {8,9,10,11,12,13,14,15,16,17,18,19,23,22,21,20}, 0);
-//    set_rx_channel_feed_chain(12, (uint8_t [12]) {8,9,10,11,12,13,14,15,16,17,18,19}, 0, 0);
-//    set_rx_channel_feed_chain(4, (uint8_t [4]) {23,22,21,20}, 3, 0);
-}
+uint32_t tx_pixels_enabled[NUM_TX_PIXEL_BUFFERS] = {0u};
 
+rgbw_pixel_t tx_pixels[NUM_TX_PIXEL_BUFFERS][NUM_TX_PINS] = { { {.uint32 = 0u}} };
+
+uint32_t grb_3_channel_dest_buffer_index = 0u;
+uint32_t rgbw_4_channel_dest_buffer_index = 0u;
+
+uint32_t grb_3_channel_src_buffer_index = 0u;
+uint32_t rgbw_4_channel_src_buffer_index = 0u;

@@ -14,11 +14,29 @@
  * limitations under the License.
  */
 
-#include "pixel_feeds.h"
+#include "power_monitor_adc.h"
 
-void init_pixel_feeds() {
-    set_on_off_feed_chain(16, (uint8_t [16]) {8,9,10,11,12,13,14,15,16,17,18,19,23,22,21,20}, 0);
-//    set_rx_channel_feed_chain(12, (uint8_t [12]) {8,9,10,11,12,13,14,15,16,17,18,19}, 0, 0);
-//    set_rx_channel_feed_chain(4, (uint8_t [4]) {23,22,21,20}, 3, 0);
+#include "hardware/adc.h"
+
+void start_power_monitor_adc() {
+    adc_init();
+    adc_set_clkdiv(0); // 0 -> full speed (500 kHz)
+    adc_select_input(ADC_NUM);
+    adc_set_temp_sensor_enabled(false);
+    adc_irq_set_enabled(false);
+    adc_fifo_setup(true, true, 1u, true, false);
+
+    adc_run(true);
 }
 
+void stop_power_monitor_adc() {
+    adc_run(false);
+
+    // wait for done
+    while (!(adc_hw->cs & ADC_CS_READY_BITS)) {
+        tight_loop_contents();
+    }
+
+    // disable adc
+    hw_clear_bits(&adc_hw->cs, ADC_CS_EN_BITS);
+}

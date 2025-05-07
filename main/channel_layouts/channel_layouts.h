@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-#include "pixel_feeds.h"
+#ifndef SUPER_SCORPIO_CHANNEL_LAYOUTS_H
+#define SUPER_SCORPIO_CHANNEL_LAYOUTS_H
 
-void init_pixel_feeds() {
-    set_on_off_feed_chain(16, (uint8_t [16]) {8,9,10,11,12,13,14,15,16,17,18,19,23,22,21,20}, 0);
-//    set_rx_channel_feed_chain(12, (uint8_t [12]) {8,9,10,11,12,13,14,15,16,17,18,19}, 0, 0);
-//    set_rx_channel_feed_chain(4, (uint8_t [4]) {23,22,21,20}, 3, 0);
-}
+#include "common.h"
 
+typedef struct tx_channel tx_channel_t;
+
+typedef struct channel_layout {
+    void (*set_chain_index)(const uint8_t tx_channel_num);
+} channel_layout_t;
+
+
+
+#endif //SUPER_SCORPIO_CHANNEL_LAYOUTS_H

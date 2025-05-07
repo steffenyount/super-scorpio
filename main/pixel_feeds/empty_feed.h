@@ -17,8 +17,14 @@
 #ifndef SUPER_SCORPIO_EMPTY_FEED_H
 #define SUPER_SCORPIO_EMPTY_FEED_H
 
-#include "pixel_feeds.h"
+#include "pixel_feed_base.h"
 
-extern tx_feed_t empty_feed;
+typedef struct empty_feed {
+    pixel_feed_base_t;
+} empty_feed_t;
+
+extern empty_feed_t empty_feed;
+
+void set_empty_feed(uint8_t gpio_num);
 
 #endif //SUPER_SCORPIO_EMPTY_FEED_H

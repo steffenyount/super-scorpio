@@ -1,0 +1,95 @@
+;  Copyright (C) 2024 Steffen Yount
+;
+;  Licensed under the Apache License, Version 2.0 (the "License");
+;  you may not use this file except in compliance with the License.
+;  You may obtain a copy of the License at
+;
+;  http://www.apache.org/licenses/LICENSE-2.0
+;
+;  Unless required by applicable law or agreed to in writing, software
+;  distributed under the License is distributed on an "AS IS" BASIS,
+;  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;  See the License for the specific language governing permissions and
+;  limitations under the License.
+
+.program tx_bytes_to_gpio_pins
+.origin 0
+
+tx_next_bytes:
+    pull                 ; pull tx_enabled mask
+
+    mov osr, ::osr       ; reverse bit order to store tx_enabled mask value in the register's higher bits
+    out NULL, 5          ; discard lower 5 bits of reversed value
+    in osr, 27           ; compose reversed tx_enabled mask value for the register's higher bits
+    set x, 8             ; set loop counter value to loop 8 bits per byte
+    in x, 5              ; compose loop counter bits for the register's lower bits
+    mov x, isr           ; store composite (tx_enabled mask + loop counter) value in register
+
+    pull                 ; pull tx_byte data for gpios 0-3
+    mov osr, ::osr       ; reverse bit order for tx_byte data, to transmit most significant bit first
+
+.wrap_target
+    mov pins, ::x   [30] ; ** set pins for 47 ticks: aligned to tx_enabled mask **
+
+    in null, 28      [5] ; pad 0 for high 28-bits of isr
+    in osr, 1            ; capture select bit of byte 3
+    out null, 1          ; advance 1 bit
+    mov y, osr           ; stash offset tx_byte data
+    out null, 7          ; advance to select bit of byte 2
+    in osr, 1            ; capture select bit of byte 2
+    out null, 8          ; advance to select bit of byte 1
+    in osr, 1            ; capture select bit of byte 1
+    out null, 8          ; advance to select bit of byte 0
+    in osr, 1            ; capture select bit of byte 0
+    mov osr, y           ; restore stashed tx_byte data for next round
+
+    mov pins, isr   [30] ; ** set pins for 62 ticks: aligned to selected bits **
+    nop             [30] ; wait for it...
+    mov pins, null  [30] ; ** set pins 7x for 47 ticks and 1x for 49 ticks: all pins off **
+
+    jmp x-- next     [4] ; decrement the loop counter value
+next:
+    in null, 27          ; pad 0 for high 27-bits of isr
+    in x, 5              ; extract loop counter bits
+    mov y, isr           ; store loop counter value in register for eval
+    jmp !y tx_next_bytes
+    nop              [6] ; wait for it...
+.wrap
+
+% c-sdk {
+
+#include "common.h"
+
+static inline void tx_bytes_to_gpio_pins_program_init(PIO pio, uint sm, uint offset, uint pins_base, uint pins_count) {
+    pio_sm_config sm_cfg = tx_bytes_to_gpio_pins_program_get_default_config(offset);
+
+    // make TXF 8 words deep
+    sm_config_set_fifo_join(&sm_cfg, PIO_FIFO_JOIN_TX);
+    // OUT shifts to right, no autopull
+    sm_config_set_out_shift(&sm_cfg, true, false, 32u);
+    // IN shifts to left, no autopush
+    sm_config_set_in_shift(&sm_cfg, false, false, 32u);
+    sm_config_set_out_pins(&sm_cfg, pins_base, pins_count);
+
+    pio_sm_init(pio, sm, offset, &sm_cfg);
+
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+static inline void init_pio1_for_tx_bytes_to_gpio_pins_programs() {
+    uint offset = pio_add_program(pio1, &tx_bytes_to_gpio_pins_program);
+
+    // tx GPIO PINS 8-23
+    for (uint8_t gpio_num = GPIO_TX_PINS_BEGIN; gpio_num < GPIO_TX_PINS_END; gpio_num++) {
+        gpio_set_function_no_side_effects(gpio_num, GPIO_FUNC_PIO1);
+    }
+
+    for (uint sm = 0u; sm < NUM_PIO_STATE_MACHINES; sm++) {
+        uint sm_pins_base = GPIO_TX_PINS_BEGIN + (NUM_PIO_STATE_MACHINE_TX_PINS * sm);
+
+        pio_sm_set_consecutive_pindirs(pio1, sm, sm_pins_base, NUM_PIO_STATE_MACHINE_TX_PINS, true);
+        tx_bytes_to_gpio_pins_program_init(pio1, sm, offset, sm_pins_base, NUM_PIO_STATE_MACHINE_TX_PINS);
+    }
+}
+
+%}
