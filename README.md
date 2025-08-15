@@ -13,32 +13,31 @@ True, there are some off-the shelf ARGB controller hubs out there, but none did 
 project was born. With my Super Scorpio I can now read the two ARGB data streams from both my motherboard and my video
 card and then arbitrarily map their pixel data outputs onto all of my separate kits' individual ARGB LED segments.
 
-## The Hardware
-### The Super Scorpio ARGB Controller Hub
+## Hardware: The Super Scorpio ARGB Controller Hub
 The Super Scorpio ARGB controller hub consists of an off-the-shelf Adafruit Feather RP2040 Scorpio board paired with my
 custom Super Scorpio FeatherWing board.
 
-#### Adafruit's Feather RP2040 Scorpio board
+### Adafruit's Feather RP2040 Scorpio board
 The Adafruit Feather RP2040 Scorpio board includes a USB Type-C connector for powering and programing the RP2040
 processor, 264KB of SRAM, 8MB of SPI Flash, a 12MHz crystal to run at a reliable 125 MHz, and 8 level shifters with
-dedicated pins to control 8 channels of 5V ARGB output.
+dedicated pins to control 8 channels of 5V ARGB data output.
 
 https://learn.adafruit.com/introducing-feather-rp2040-scorpio
 https://github.com/adafruit/Adafruit-Feather-RP2040-SCORPIO-PCB
 
 ![Adafruit Feather RP2040 Scorpio](assets/images/RP2040-Scorpio.jpg)
 
-#### My custom Super Scorpio FeatherWing board
+### My custom Super Scorpio FeatherWing board
 My custom Super Scorpio FeatherWing board mounts on top of the Adafruit Feather RP2040 Scorpio board, adding a 5V power
-bus, a current sensor, level shifters, and many more pins for 5V ARGB I/O connections using a standard compact VDG pin
+bus, a current sensor, level shifters, and many more pins for 5V ARGB I/O connections using the standard compact VDG pin
 layout.
 
-My EasyEDA project for the [Super Scorpio FeatherWing PCB](https://oshwlab.com/steffenyount/drgb-controller_copy_copy_copy_copy)
+My EasyEDA project for the [Super Scorpio FeatherWing board](https://oshwlab.com/steffenyount/drgb-controller_copy_copy_copy_copy)
 
 ![Super Scorpio FeatherWing board](assets/images/Super_Scorpio_FeatherWing_v3_small.jpg)
 
-#### Features
-The Super Scorpio ARGB Controller Hub includes the following features:
+### Features
+The Super Scorpio ARGB Controller Hub includes the following hardware features:
 * Molex power connector to deliver 50W of LED power from an ATX power supply
 * LED power/current monitoring over a 0-11A input range (ADC pin A0)
 * LED power and data I/O connectivity provided with compact DG/VDG pin headers
@@ -50,4 +49,38 @@ The Super Scorpio ARGB Controller Hub includes the following features:
 * 2x PIO blocks (RP2040 programmable input/output processors) for ARGB data I/O offloading
 * 12x DMA controllers
 
-## The Software
+
+## Software: The Super Scorpio Project
+The Super Scorpio project is organized into modules each with its own operational focus.
+
+### Fast systick logging
+#### [tick_log](main/tick_log/)
+
+### Power monitoring
+#### [power_monitor](main/power_monitor/)
+
+### LED segment discovery
+#### [channel_control](main/channel_control/)
+#### [channel_discovery](main/channel_discovery/)
+
+### Power limiting
+#### [power_limiter](main/power_limiter/)
+
+### Pixel channels
+#### [pixel_channels](main/pixel_channels/)
+#### [channel_layouts](main/channel_layouts/)
+#### [channel_overrides](main/channel_overrides/)
+
+### RX/TX offloading
+#### [pixel_rx_loop](main/pixel_rx_loop/)
+#### [pixel_tx_loop](main/pixel_tx_loop/)
+
+### Pixel feeds
+#### [pixel_feeds](main/pixel_feeds/)
+
+### The startup sequence
+#### [main.c](main/main.c)
+
+### The runtime loop
+
+### Work in progress/Coming soon
