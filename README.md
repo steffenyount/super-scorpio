@@ -50,8 +50,8 @@ The Super Scorpio ARGB Controller Hub includes the following hardware features:
 * 12x DMA controllers
 
 
-## Software: The Super Scorpio Project
-The Super Scorpio project is organized into modules each with its own operational focus.
+## Software: The Super Scorpio driver
+The Super Scorpio driver source code is organized into modules each with its own operational focus.
 
 ### Fast systick logging
 #### [tick_log](main/tick_log/)
@@ -83,4 +83,27 @@ The Super Scorpio project is organized into modules each with its own operationa
 
 ### The runtime loop
 
-### Work in progress/Coming soon
+## Project status
+### This project is still a work in progress
+The core functionality is there. LED segment discovery is working, and the runtime loop reliably generates or relays 16
+channels x 800Kbps of simultaneous ARGB data. Custom channel layouts can be configured statically using compile time
+overrides.
+
+### New features under consideration:
+* Need a better way to configure/rotate/map individual parts of daisy chained pixel segments on a shared channel.
+* Need to revisit the use of the rgbw_pixel_t type in the tx_pixels[][] buffer and probably the channel_layouts
+abstraction. I'd like to support mixing both GRB and RGB 3-byte pixel segments on a shared channel. With this change
+the tx_pixels[][] buffer semantics will change to contain either a 3-byte (or 4-byte) array of presorted GRB or RGB
+pixel bytes, ready for DMA to push out to the PIO in the target pixel segment's expected byte order.
+* Explore a compound/blending pixel_feed type using the RP2040's interpolator hardware.
+* Would be nice to be able to specify pixel segment layouts in a 2D canvas, and then use the canvas's coordinates to
+inform pixel data selection for a segment's pixel feed. A bonus feature could lean on the interpolator hardware to
+rescale/map canvas pixels from a 2D input frame's pixel coordinates.
+* Investigate building a web based control interface over the USB connection.
+* Implement runtime persistence in flash for channel configs and palette based pixel feeds (should survive software
+updates)
+* Possibly explore a new hardware/software implementation based on RP2350B for other use cases? With 3 PIO blocks
+dedicated to TX, this could theoretically drive 48 ARGB channels concurrently. Would this work as an HDMI adapter?
+Could this drive a 128x72 ARGB pixel display composed of 36 individual 32x8 panels at 60fps? Or drive a 256x144 ARGB
+pixel display composed of 144 individual 16x16 panels chained with 3 segments per channel at 30fps?
+
