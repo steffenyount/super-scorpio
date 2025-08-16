@@ -55,13 +55,70 @@ The Super Scorpio driver source code is organized into modules each with its own
 
 ### Fast systick logging
 #### [tick_log](main/tick_log/)
+The systick logger implements an extremely fast and lightweight logging mechanism. Messages are recorded in 2 separate
+ring buffers, one per CPU. The records each include only 3 32-bit values: the CPU's current systick timestamp, a
+printf style message string reference, and then optionally either a second string reference or an uint32_t value.
+```
+typedef struct {
+    uint32_t systick;
+    char * msg;
+    union {
+        uint32_t value;
+        char * string;
+    };
+} log_t;
+```
+
+This allows the systick logger to support the following logging interface parameters:
+```
+void log_tick(char * msg);
+void log_tick_with_string(char * msg, char * string);
+void log_tick_with_value(char * msg, uint32_t uint32);
+```
+
+Individual log messages are recorded in less than 10 CPU steps, making this a useful tool for log-debugging in
+situations with tight timing or processing constraints.
+
+The heavy lifting for the printf msg string token evaluation is processed outside the critical path, when there's CPU
+availability for packing-up bytes and reporting them out over the USB connection.
+
 
 ### Power monitoring
 #### [power_monitor](main/power_monitor/)
+The RP2040's ADC is set to monitor pin A0 where it captures 12-bit sample values at 500kHz (or 2us per sample). The
+Super Scorpio is designed to drive +300mV on pin A0 per 1 Amp of input current sensed. At 11A this should be 3.3V with
+the max sample value of 4095. According to the spec sheet, the ADC's DNL should be mostly flat and below 1 LSB. However,
+my oscilloscope indicated noise on the A0 input pin, which spanned a range of ~2.9 LSB when 274 ARGB LEDs were attached.
+To cut through this noise the DMA power monitor feed collects a series of 16 samples into the power_samples buffer and
+then returns their median value. In theory, assuming the noise is randomly distributed, using this median should get
+the noise levels down to near 1 LSB. In practice, I assume 10-bit sample accuracy from these median values. If we need
+more precision we should be able to get there by averaging a consecutive number N of these median value results, where
+L = bits of precision to increase, and N = 4^L.
+
+Two functions are provided to facilitate capturing these values:
+```
+uint16_t get_median_of_power_samples()
+uint32_t get_precision_power_sample(uint32_t bits)
+```
 
 ### LED segment discovery
 #### [channel_control](main/channel_control/)
+The ARGB LEDs on a channel can be controlled by sending bit data directly to them using one of the RP2040 PWM
+controllers. With help from some clever DMA feed chain rules, this work can be queued up and launched by the CPU. It
+then proceeds through till completion asynchronously.
+```
+void set_gpio_channel_pixels_on_for_byte_range(uint8_t gpio_num, uint32_t start, uint32_t end)
+```
+
 #### [channel_discovery](main/channel_discovery/)
+To determine how many ARGB LEDs are on a given channel, I first assume a continuous strip of LED lights are available
+on that channel. Then I set all channels' LED lights to off, and collect a baseline "off" power sample. Next I apply a
+bisect algorithm by toggling the LED light's bytes on/off and comparing the new power sample values with the baseline
+value. Once I find the first_known_off byte's position at the end of the channel, I can guess if the LED light strip has
+3-byte or 4-byte pixels, and also determine the channel's pixel_type and the channel's pixel_count values.
+```
+void discover_tx_channel_pixels()
+```
 
 ### Power limiting
 #### [power_limiter](main/power_limiter/)
@@ -95,11 +152,11 @@ overrides.
 abstraction. I'd like to support mixing both GRB and RGB 3-byte pixel segments on a shared channel. With this change
 the tx_pixels[][] buffer semantics will change to contain either a 3-byte (or 4-byte) array of presorted GRB or RGB
 pixel bytes, ready for DMA to push out to the PIO in the target pixel segment's expected byte order.
-* Explore a compound/blending pixel_feed type using the RP2040's interpolator hardware.
+* Explore a compound source/blending pixel_feed type using the RP2040's interpolator hardware.
 * Would be nice to be able to specify pixel segment layouts in a 2D canvas, and then use the canvas's coordinates to
 inform pixel data selection for a segment's pixel feed. A bonus feature could lean on the interpolator hardware to
 rescale/map canvas pixels from a 2D input frame's pixel coordinates.
-* Investigate building a web based control interface over the USB connection.
+* Investigate building a web based control interface that's accessible over the USB connection.
 * Implement runtime persistence in flash for channel configs and palette based pixel feeds (should survive software
 updates)
 * Possibly explore a new hardware/software implementation based on RP2350B for other use cases? With 3 PIO blocks
