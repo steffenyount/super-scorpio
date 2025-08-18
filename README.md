@@ -50,8 +50,53 @@ The Super Scorpio ARGB Controller Hub includes the following hardware features:
 * 12x DMA controllers
 
 
-## Software: The Super Scorpio driver
-The Super Scorpio driver source code is organized into modules each with its own operational focus.
+## Software: The Super Scorpio
+### Theory of operation
+#### Limitations of the current implementation 
+System state is not persisted between reboots. All configurations are either hard coded in at compile time or set by
+the LED segment discovery process during startup.
+
+#### The startup sequence
+* Runs [main()](main/main.c) on core0.
+* Hardware is initialized: stdio to USB, DMA bus priority, GPIO functions/pads/IO, systick counter, IRQs enabled, etc.
+* RX/TX Channel configuration structures are initialized
+* PWM is initialized for direct channel LED control
+* DMA feeds and ADC are initialized for power monitoring
+* LED segment discovery is run and TX Channel configs are updated to reflect the attached LED segments
+* Channel configs are further updated with the hard coded channel override settings
+* TX Channel LEDs are lit up to test max power draw
+* Channel LED segment config lengths are truncated if necessary to ensure the LED power limit
+* Pixel data feeds are assigned to the channels
+* Runs [core1_main()](main/main.c) on core1
+* The systick counter hardare is initialized on core1 and an attempt is made to sync the two core's systick counters
+* GPIO functions are reconfigured for PIO based channel LED data output streaming
+* The pixel data feed and LED byte data TX processing loop is launched on core1
+* The asynchronous pixel data input processing loop is launched on core0
+* The tick log stdio print loop is launched on core0
+
+#### The runtime loops
+* Last in the TX chain are 4x PIO processors feeding 4x channels of LED bit data each, for a total of 16x GPIO-pins
+* TX-bytes are serialized as LED bit data on the output GPIO-pins at a steady 800kbps (10us/1250 CPU_ticks per Byte)
+* The PIO processors transmit 8-bits into 4 channels for every one TX-byte-data input they receive
+* The PIO processors can buffer up to 4 of these TX-byte-data inputs in their input queues
+* DMA marshals TX-byte-data from TX-pixels in the tx_data staging buffer to add them as TX-byte-data into the PIO queues 
+* The pixel TX loop runs on core1 on a byte-by-byte cadence and coordinates the double buffer tx_data staging area
+* It advances the TX-bytes-feed state machines to populate the tx_data staging buffers with TX-pixel data
+* It triggers DMA to feed TX-byte-data into the PIO queues
+* The pixel TX loop's cadence is metered by DMA feed completion and PIO input queue levels. These determine when the
+tx_data double buffers may be swapped and when the next DMA feed may be triggered
+* The TX-bytes-feed state machines choreograph frames of LED byte data per channel: start, middle, and end
+* They mind the 3-byte (or 4-byte) pixel counts and call channel pixel-feeds to load their next TX-pixel into tx_data
+* Data frames are started either based on a timer interval or the pixel_feeds_ready flag being set for their channel
+* 4x PIO processors monitor 4 channels of input LED bit data deserializing them into RX-bytes
+* The RX-bytes are DMA's into rx_channel byte buffers, overflow RX-bytes are dropped
+* When the end of an input frame is detected by the PIO, IRQ handlers are triggered that run on core0 
+* The PIO and DMA are reset to receive the next frame
+* The rx_channel's byte_count and other stats are updated
+* The pixel_feeds_ready flags are set for any channels that requested them
+
+### Modules
+The Super Scorpio source code is organized into modules each with its own operational focus.
 
 ### Fast systick logging
 #### [tick_log](main/tick_log/)
@@ -134,11 +179,6 @@ void discover_tx_channel_pixels()
 
 ### Pixel feeds
 #### [pixel_feeds](main/pixel_feeds/)
-
-### The startup sequence
-#### [main.c](main/main.c)
-
-### The runtime loop
 
 ## Project status
 ### This project is still a work in progress
