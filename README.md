@@ -53,8 +53,8 @@ The Super Scorpio ARGB Controller Hub includes the following hardware features:
 ## Software: The Super Scorpio
 ### Theory of operation
 #### Limitations of the current implementation 
-System state is not persisted between reboots. All configurations are either hard coded in at compile time or set by
-the LED segment discovery process during startup.
+System state is not persisted between reboots. There is no UI for runtime configuration. All configurations are either
+hard coded in at compile time or set by the LED segment discovery process during startup.
 
 #### The startup sequence
 * Runs [main()](main/main.c) on core0.
@@ -63,7 +63,7 @@ the LED segment discovery process during startup.
 * PWM is initialized for direct channel LED control
 * DMA feeds and ADC are initialized for power monitoring
 * LED segment discovery is run and TX Channel configs are updated to reflect the attached LED segments
-* Channel configs are further updated with the hard coded channel override settings
+* Channel configs are further updated with hard coded channel override settings
 * TX Channel LEDs are lit up to test max power draw
 * Channel LED segment config lengths are truncated if necessary to ensure the LED power limit
 * Pixel data feeds are assigned to the channels
@@ -76,7 +76,8 @@ the LED segment discovery process during startup.
 
 #### The runtime loops
 * Last in the TX chain are 4x PIO processors feeding 4x channels of LED bit data each, for a total of 16x GPIO-pins
-* TX-bytes are serialized as LED bit data on the output GPIO-pins at a steady 800kbps (10us/1250 CPU_ticks per Byte)
+* TX-bytes are serialized as LED bit data on the output GPIO-pins at a steady 800kbps (that's 10us or 1250 CPU ticks
+per Byte)
 * The PIO processors transmit 8-bits into 4 channels for every one TX-byte-data input they receive
 * The PIO processors can buffer up to 4 of these TX-byte-data inputs in their input queues
 * DMA marshals TX-byte-data from TX-pixels in the tx_data staging buffer to add them as TX-byte-data into the PIO queues 
@@ -160,13 +161,19 @@ To determine how many ARGB LEDs are on a given channel, I first assume a continu
 on that channel. Then I set all channels' LED lights to off, and collect a baseline "off" power sample. Next I apply a
 bisect algorithm by toggling the LED light's bytes on/off and comparing the new power sample values with the baseline
 value. Once I find the first_known_off byte's position at the end of the channel, I can guess if the LED light strip has
-3-byte or 4-byte pixels, and also determine the channel's pixel_type and the channel's pixel_count values.
+3-byte or 4-byte pixels, and also the channel's pixel_type and the channel's pixel_count values.
 ```
 void discover_tx_channel_pixels()
 ```
 
 ### Power limiting
 #### [power_limiter](main/power_limiter/)
+The power limiter implements a crude system at startup to avoid exceeding our power limits. Starting with all LEDs off,
+on all channels, we turn the LEDs on, channel by channel, 16 pixels at a time, and sample our power usage after each
+increment. If we exceed our 10A threshold value, we break, turn off all the lights, and remove all the LEDs registered
+for channels beyond where we exceeded that threshold in our linear channel by channel testing. This disables the
+excess LEDs, preventing their use during that session, and thus capping their power draw until the Super Scorpio is
+rebooted.
 
 ### Pixel channels
 #### [pixel_channels](main/pixel_channels/)
@@ -199,6 +206,10 @@ rescale/map canvas pixels from a 2D input frame's pixel coordinates.
 * Investigate building a web based control interface that's accessible over the USB connection.
 * Implement runtime persistence in flash for channel configs and palette based pixel feeds (should survive software
 updates)
+* Implement an alternate runtime strategy for power limiting with an alternate shutdown strategy, or hiccup mode, etc.
+* A V pin added to the DG input pins could be a useful addition to the input headers. It would allow us to detect when
+a source controller turned off its ARGB LEDs by cutting their power. We could then take action to zero out our
+rx_channel buffers when the input's power is cut.
 * Possibly explore a new hardware/software implementation based on RP2350B for other use cases? With 3 PIO blocks
 dedicated to TX, this could theoretically drive 48 ARGB channels concurrently. Would this work as an HDMI adapter?
 Could this drive a 128x72 ARGB pixel display composed of 36 individual 32x8 panels at 60fps? Or drive a 256x144 ARGB
