@@ -3,8 +3,8 @@ Chain and control multiple NeoPixel/ARGB LED strips with the Super Scorpio!
 
 ## Background
 I was looking for an excuse to work with the RP2040 microcontroller and I found one. My computer case "needed" some RGB
-bling, and as I added addressable RGB kits here and there for the pumps, plates, and fans, etc, I quickly found out
-that most-all off-the-shelf ARGB kits have zero provisions for daisy chaining their individual ARGB segments. This is
+bling, and as I added addressable RGB kits here and there for the pumps, plates, and fans, etc. I quickly found out
+that most-all off-the-shelf ARGB kits have zero provisions for daisy-chaining their individual ARGB segments. This is
 unfortunate since my motherboard provides just 1 ARGB header while my video card also provides just 1 ARGB header. Both
 of these ARGB sources have hardware to make pretty blinken-lights while also color encoding some hardware state
 information like CPU/GPU temps, etc.
@@ -51,15 +51,18 @@ The Super Scorpio ARGB Controller Hub includes the following hardware features:
 
 
 ## Software: The Super Scorpio
+The Super Scorpio is implemented in C and makes heavy use of the Raspberry Pi Pico C SDK.
+
 ### Theory of operation
 #### Limitations of the current implementation 
-System state is not persisted between reboots. There is no UI for runtime configuration. All configurations are either
-hard coded in at compile time or set by the LED segment discovery process during startup.
+* System state is not persisted between reboots
+* There is no UI for runtime configuration
+* All configurations are either hard coded in at compile time or set by the LED segment discovery process during startup
 
 #### The startup sequence
 * Runs [main()](main/main.c) on core0.
 * Hardware is initialized: stdio to USB, DMA bus priority, GPIO functions/pads/IO, systick counter, IRQs enabled, etc.
-* RX/TX Channel configuration structures are initialized
+* RX/TX channel configuration structures are initialized
 * PWM is initialized for direct channel LED control
 * DMA feeds and ADC are initialized for power monitoring
 * LED segment discovery is run and TX Channel configs are updated to reflect the attached LED segments
@@ -76,25 +79,25 @@ hard coded in at compile time or set by the LED segment discovery process during
 
 #### The runtime loops
 * Last in the TX chain are 4x PIO processors feeding 4x channels of LED bit data each, for a total of 16x GPIO-pins
-* TX-bytes are serialized as LED bit data on the output GPIO-pins at a steady 800kbps (that's 10us or 1250 CPU ticks
+* tx_bytes are serialized as LED bit data on the output GPIO-pins at a steady 800kbps (that's 10us or 1250 CPU ticks
 per Byte)
-* The PIO processors transmit 8-bits into 4 channels for every one TX-byte-data input they receive
-* The PIO processors can buffer up to 4 of these TX-byte-data inputs in their input queues
-* DMA marshals TX-byte-data from TX-pixels in the tx_data staging buffer to add them as TX-byte-data into the PIO queues 
+* The PIO processors transmit 8-bits into 4 channels for every one tx_data input they receive
+* The PIO processors can buffer up to 4 of these tx_data inputs in their input queues
+* DMA marshals tx_bytes from tx_pixels into the tx_data staging buffer before copying them into the PIO queues 
 * The pixel TX loop runs on core1 on a byte-by-byte cadence and coordinates the double buffer tx_data staging area
-* It advances the TX-bytes-feed state machines to populate the tx_data staging buffers with TX-pixel data
-* It triggers DMA to feed TX-byte-data into the PIO queues
+* It advances the tx_bytes_feed state machines to populate the tx_data staging buffers with tx_pixel data
+* It triggers DMA to feed the tx_data into the PIO queues
 * The pixel TX loop's cadence is metered by DMA feed completion and PIO input queue levels. These determine when the
 tx_data double buffers may be swapped and when the next DMA feed may be triggered
-* The TX-bytes-feed state machines choreograph frames of LED byte data per channel: start, middle, and end
-* They mind the 3-byte (or 4-byte) pixel counts and call channel pixel-feeds to load their next TX-pixel into tx_data
+* The tx_bytes_feed state machines choreograph frames of LED byte data per channel: start, middle, and end
+* They mind the 3-byte (or 4-byte) pixel counts and call channel pixel-feeds to load their next tx_pixel into tx_data
 * Data frames are started either based on a timer interval or the pixel_feeds_ready flag being set for their channel
-* 4x PIO processors monitor 4 channels of input LED bit data deserializing them into RX-bytes
-* The RX-bytes are DMA's into rx_channel byte buffers, overflow RX-bytes are dropped
+* 4x PIO processors monitor 4 channels of input LED bit data deserializing them into rx_bytes
+* The rx_bytes are DMA's into rx_channel byte buffers, overflow rx_bytes are dropped
 * When the end of an input frame is detected by the PIO, IRQ handlers are triggered that run on core0 
 * The PIO and DMA are reset to receive the next frame
 * The rx_channel's byte_count and other stats are updated
-* The pixel_feeds_ready flags are set for any channels that requested them
+* The pixel_feeds_ready flags are set for any tx_channels that requested them
 
 ### Modules
 The Super Scorpio source code is organized into modules each with its own operational focus.
@@ -166,19 +169,50 @@ value. Once I find the first_known_off byte's position at the end of the channel
 void discover_tx_channel_pixels()
 ```
 
+#### [channel_overrides](main/channel_overrides/)
+Channel overrides are applied after channel discovery. They allow channel details like pixel_type and pixel_count to be
+configured statically in code, overriding any values set by the channel discovery process.
+```
+void apply_channel_overrides()
+```
+
 ### Power limiting
 #### [power_limiter](main/power_limiter/)
-The power limiter implements a crude system at startup to avoid exceeding our power limits. Starting with all LEDs off,
+The power limiter implements a crude system at startup to avoid exceeding power limits. Starting with all LEDs off,
 on all channels, we turn the LEDs on, channel by channel, 16 pixels at a time, and sample our power usage after each
-increment. If we exceed our 10A threshold value, we break, turn off all the lights, and remove all the LEDs registered
-for channels beyond where we exceeded that threshold in our linear channel by channel testing. This disables the
-excess LEDs, preventing their use during that session, and thus capping their power draw until the Super Scorpio is
+increment. If we exceed our 10A threshold value, we break, turn off all the lights again, and remove any LEDs
+registered for channels beyond where we exceeded that threshold in our linear channel by channel testing. This disables
+the excess LEDs, preventing their use during that session, and thus caps their power draw until the Super Scorpio is
 rebooted.
+```
+void limit_tx_channel_power()
+```
 
 ### Pixel channels
 #### [pixel_channels](main/pixel_channels/)
+The Super Scorpio software models the GPIO-pin hardware used for LED bit data I/O as channels. The data needed for
+channel hardware access, program configuration, and runtime state, are maintained per I/O channel in the rx_channel and
+tx_channel structs respectively.
+```
+extern rx_channel_t rx_channels[NUM_RX_PINS];
+extern tx_channel_t tx_channels[NUM_TX_PINS];
+```
+
 #### [channel_layouts](main/channel_layouts/)
-#### [channel_overrides](main/channel_overrides/)
+Layouts support a simple model where one homogeneous strip of LEDs is configured per channel. Layouts map the physical
+indexes of the LEDs on each channel to a corresponding chain_index value. This chain_index is passed to the channel's
+associated pixel_feed at runtime, this determines which pixel data is fed to each LED. Layouts provide implementation
+flexibility by mapping pixel_feed frame coordinates onto physical LED layouts. LED strips can have their index order
+reversed, flipping their orientation. LED circles can have their zero index rotated and/or their index order reversed,
+reorienting them and/or flipping their chirality. Multiple LED strips across multiple channels can be chained together
+forming one long virtual LED strip that shares the same pixel_feed.
+
+Only 2 channel_layouts have been implemented: linear_layout and reverse_layout. The channel_layout abstraction is
+flexible and can be extended. The existing layouts are assigned to a channel by using their helper functions:
+```
+void set_linear_layout(uint8_t tx_gpio_num);
+void set_reverse_layout(uint8_t tx_gpio_num);
+```
 
 ### RX/TX offloading
 #### [pixel_rx_loop](main/pixel_rx_loop/)
