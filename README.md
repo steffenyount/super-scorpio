@@ -255,7 +255,7 @@ TX loop processing has failed to keep up with the PIO TX rate)
 5. Mark the tx_data transfer complete by updating the tx_data_fed_index value to match the tx_data_pending_index value
 
 The ctrls_and_srcs_for_tx_bytes_feed[][] 16-step plans for the dma_tx_bytes_feed are dynamically configured to align
-with each channel's 3-byte or 4-byte pixel_type and their double buffered tx_pixel[] data sources, once channel
+with each channel's 3-byte or 4-byte pixel_type and their double buffered tx_pixels[] data sources, once channel
 discovery and overrides have completed. This requires a total of 24 (2x3x4) 16-step plans in the
 ctrls_and_srcs_for_tx_bytes_feed[][] array.
 
@@ -302,42 +302,46 @@ is called to update the channel's `chain_index` value, `feed_pixel()` is called 
 on the channel's `pixel_feed`, `frames_fed` is incremented, the channel's `tx_bytes_fed_reset_target` is set, and the
 state machine is transitioned from `active` to `terminal`.
 * `disable_tx_pixel()` - Checks if a `terminal` channel's `tx_pixels_enabled` bit is set to ON. If so, clears the
-channel's `tx_pixel` value to 0, and the channel's `tx_pixels_enabled` bit is set to OFF. If not, the state machine is
+channel's `tx_pixels` value to 0, and the channel's `tx_pixels_enabled` bit is set to OFF. If not, the state machine is
 transitioned from `terminal` to `resetting`.
 * `advance_reset_count()` - Checks if a `terminal` or `resetting` channel's `tx_bytes_fed_reset_target` has been met.
 If so, the state machine is transitioned to `idle`.
 
 The pixel TX loop calls `advance_tx_bytes()` to advance the tx_bytes_feed state machines and ensure that all channel's
-`tx_pixel` buffer data is up-to-date before triggering the next DMA transfer. This invokes the following state machine
+`tx_pixels` buffer data is up-to-date before triggering the next DMA transfer. This invokes the following state machine
 function calls:
 1. When it's time to load 3-byte pixels:
     1. Call `activate_when_ready()` on all `idle-3-byte` state machines
     2. Call `advance_tx_pixel()` on all `active-3-byte` state machines
     3. Call `disable_tx_pixel()` on all `terminal-3-byte` state machines
-    4. Swap the 3-byte channels' `tx_pixel` double buffers
+    4. Swap the 3-byte channels' `tx_pixels` and `tx_pixels_enabled` double buffers
 2. When it's time to load 4-byte pixels:
     1. Call `activate_when_ready()` on all `idle-4-byte` state machines
     2. Call `advance_tx_pixel()` on all `active-4-byte` state machines
     3. Call `disable_tx_pixel()` on all `terminal-4-byte` state machines
-    4. Swap the 4-byte channels' `tx_pixel` double buffers
+    4. Swap the 4-byte channels' `tx_pixels` and `tx_pixels_enabled` double buffers
 3. Call `advance_reset_count()` on all `terminal-3-byte` state machines
 4. Call `advance_reset_count()` on all `terminal-4-byte` state machines
 5. Call `advance_reset_count()` on all `resetting` state machines
 6. Increment the `tx_bytes_fed` counter
 
-The pixel TX loop implements these steps:
+The pixel TX loop itself implements the following steps:
 1. Call `advance_tx_bytes()`
-2. Wait for the previous `tx_data` transfer to complete
-3. Stage current `tx_enabled` bit values into the `tx_data` buffer
+2. Wait for the previous `tx_data` DMA transfer to complete
+3. Stage the `tx_pixels_enabled` bit values as `tx_enabled` data in the `tx_data` buffer
 4. Wait till sufficient space is available in the PIO input queues
 5. Trigger the next DMA transfer
-6. Check if a stall was recorded on the previous loop, if so log it in the tick_log
+6. Check if a PIO stall was recorded during the previous loop iteration, if so log it in the tick_log
 7. Capture a systick timestamp marking the end of this loop iteration
-8. Repeat 
-
+8. Repeat
+```
+void run_pixel_tx_loop()
+```
 
 ### Pixel feeds
 #### [pixel_feeds](main/pixel_feeds/)
+
+
 
 ## Project status
 ### This project is still a work in progress
