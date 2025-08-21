@@ -105,7 +105,7 @@ __force_inline static stackable_tx_byte_feed_t *volatile * activate_channel_when
     if (pixel_feeds_ready & GPIO_TX_CHANNEL_MASK(tx_channel_num)) {
         // clear the tx_feed ready flag
         clear_bits(&pixel_feeds_ready, GPIO_TX_CHANNEL_MASK(tx_channel_num));
-        tx_bytes_fed_ready_target[tx_channel_num] = tx_bytes_fed;
+        tx_bytes_fed_ready_target[tx_channel_num] = tx_bytes_fed + tx_channels[tx_channel_num].bytes_fed_ready_interval;
 
         begin_frame(tx_channel_num);
         // move tx_bytes_feed idle -> active

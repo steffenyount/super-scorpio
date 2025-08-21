@@ -57,7 +57,8 @@ The Super Scorpio is implemented in C and makes heavy use of the Raspberry Pi Pi
 #### Limitations of the current implementation 
 * System state is not persisted between reboots
 * There is no UI for runtime configuration
-* All configurations are either hard coded in at compile time or set by the LED segment discovery process during startup
+* All configurations are either hard coded in at compile time or set dynamically by the LED segment discovery process
+during startup
 
 #### The startup sequence
 * Runs [main()](main/main.c) on core0.
@@ -120,9 +121,9 @@ typedef struct {
 
 This allows the systick logger to support the following logging interface parameters:
 ```
-void log_tick(char * msg);
-void log_tick_with_string(char * msg, char * string);
-void log_tick_with_value(char * msg, uint32_t uint32);
+void log_tick(char * msg)
+void log_tick_with_string(char * msg, char * string)
+void log_tick_with_value(char * msg, uint32_t uint32)
 ```
 
 Individual log messages are recorded in less than 10 CPU steps, making this a useful tool for log-debugging in
@@ -194,8 +195,8 @@ The Super Scorpio software models the GPIO-pin hardware used for LED bit data I/
 channel hardware access, program configuration, and runtime state, are maintained per I/O channel in the rx_channel and
 tx_channel structs respectively.
 ```
-extern rx_channel_t rx_channels[NUM_RX_PINS];
-extern tx_channel_t tx_channels[NUM_TX_PINS];
+extern rx_channel_t rx_channels[NUM_RX_PINS]
+extern tx_channel_t tx_channels[NUM_TX_PINS]
 ```
 
 #### [channel_layouts](main/channel_layouts/)
@@ -210,13 +211,130 @@ forming one long virtual LED strip that shares the same pixel_feed.
 Only 2 channel_layouts have been implemented: linear_layout and reverse_layout. The channel_layout abstraction is
 flexible and can be extended. The existing layouts are assigned to a channel by using their helper functions:
 ```
-void set_linear_layout(uint8_t tx_gpio_num);
-void set_reverse_layout(uint8_t tx_gpio_num);
+void set_linear_layout(uint8_t tx_gpio_num)
+void set_reverse_layout(uint8_t tx_gpio_num)
 ```
 
 ### RX/TX offloading
 #### [pixel_rx_loop](main/pixel_rx_loop/)
+The pixel receiver loop runs asynchronously in the background. It coordinates the 4 PIOs running the
+gpio_pins_to_rx_bytes program, with the 4 dma_sm_rx_bytes_feed DMA feeds, and the on_gpio_pins_to_rx_bytes_program_irq
+IRQ handler registered on core0. When new rx_bytes arrive they are captured in a rx_channel byte buffer, byte_count and
+other stats are updated, the PIO output queue and DMA feed are cleared and restarted, and registered tx_channels are
+notified through the pixel_feeds_ready flag.
+```
+void launch_pixel_rx_loop()
+```
+
 #### [pixel_tx_loop](main/pixel_tx_loop/)
+The pixel transmitter loop runs on core1. It coordinates 4 PIOs running the tx_bytes_to_gpio_pins program, the
+intermediate tx_data buffer, 3 DMA channels, 16 tx_bytes_feed state machines, and the pixel_feed data sources.
+
+Each tx_bytes_to_gpio_pins program takes 2 uint32 values for its tx_data input. The first contains the 4-bit tx_enabled
+mask and the second contains a corresponding 4 bytes of tx_byte data. When the tx_enabled bit is OFF and the tx_byte is
+0, the reset signal is transmitted for 10us. I.e: the data pin remains OFF for an 8-bit duration. When the tx_enabled
+bit is ON, then the corresponding tx_byte's bit values are transmitted according to WS2812B encoding specs. For a 0 bit
+the pin is ON for 376ns and OFF for 872ns. For a 1 bit the pin is ON for 872ns and OFF for 376ns. After each tx_byte is
+transmitted, the pin stays OFF for an extra 16ns to achieve a perfect 10us per tx_byte cadence.
+
+The tx_data buffer is 5 bit memory aligned and takes advantage of the DMA channel's ring-wrap functionality. The 16
+tx_bytes of data is stored contiguously in the later half of the tx_data buffer simplifying gather operations. The 4 PIO
+input queues are also contiguous allowing the copy operation to transfer its 8 uint32 tx_data buffer values with a
+single DMA invocation.
+
+The DMA gather and copy operations lean heavily on the DMA channel's chain-to functionality to execute start-to-finish
+without CPU intervention. At the top is the dma_tx_data_feed_director which executes a 5-step plan encoded in
+4-parameter DMA configurations that are transferred to the dma_tx_data_feed's DMA control registers for execution. These
+5 steps are found in the srcs_dests_counts_and_ctrls_for_tx_data_feed[] array:
+1. Execute the selected 16-step plan found in the ctrls_and_srcs_for_tx_bytes_feed[][] array using the dma_tx_bytes_feed
+DMA channel to gather 16 tx_bytes into the tx_data buffer
+2. Feed all 8 words from the tx_data buffer into the 4 PIO input queues
+3. Capture the PIO fdebug value into the prev_pio1_fdebug variable (The PIO TXSTALL flags therein will indicate when
+TX loop processing has failed to keep up with the PIO TX rate)
+4. Clear the PIO TXSTALL flags, to allow future PIO TX stall detection
+5. Mark the tx_data transfer complete by updating the tx_data_fed_index value to match the tx_data_pending_index value
+
+The ctrls_and_srcs_for_tx_bytes_feed[][] 16-step plans for the dma_tx_bytes_feed are dynamically configured to align
+with each channel's 3-byte or 4-byte pixel_type and their double buffered tx_pixel[] data sources, once channel
+discovery and overrides have completed. This requires a total of 24 (2x3x4) 16-step plans in the
+ctrls_and_srcs_for_tx_bytes_feed[][] array.
+
+The pixel TX loop calls `trigger_next_tx_data_feed()` to trigger the next DMA transfer in 3 steps:
+1. Select the 16-step plan based on the current tx_data_pending_index value, and update the first entry in the
+dma_tx_data_feed_director's 5-step plan to use that selected 16-step plan for gathering tx_byte data
+2. Advance the tx_data_pending_index value by 1 (wraps at 24 to 0)
+3. Trigger the dma_tx_data_feed_director to start on step 1 of its 5-step plan
+
+The tx_bytes_feed state machines are responsible for driving all channel's pixel_feeds frame-by-frame through their
+lifecycle stages:
+```
+void open_frame()
+void feed_pixel()
+void close_frame()
+```
+
+For each tx_data transfer, the tx_bytes_feed state machines adjust counters and transition between 7 states. This allows
+them to track frame boundaries, tx_pixel boundaries, and the current 3-byte or 4-byte pixel_type's tx_byte index for
+their channel. Each of the 7 states is implemented as a stack of tx_bytes_feed state machines. State transitions are
+made by removing a tx_bytes_feed state machine from one stack and adding it to another stack.
+```
+   -> [idle-3-byte]           [idle-4-byte] <-
+  /           |                   |           \
+ /            v                   v            \
+|     [active-3-byte]       [active-4-byte]     |
+|             |                   |             |
+|             v                   v             |
+|     [terminal-3-byte]   [terminal-4-byte]     |
+ \                 \         /                 /
+  \                 v       v                 /
+   --------------< [resetting] >--------------
+```
+
+Each tx_bytes_feed state machine implements the following 4 functions that perform state specific tasks and advance
+their machine's state when appropriate.
+* `activate_when_ready()` - Checks if an `idle` channel's `pixel_feeds_ready` flag has been set or the channel's
+`bytes_fed_ready_interval` has been exceeded. If so the flag is cleared and the channel's `tx_bytes_fed_ready_target` is
+updated, the channel's `pixels_fed` counter is reset to 0, `open_frame()` is called on the channel's `pixel_feed`, and
+the state machine is transitioned from `idle` to `active`.
+* `advance_tx_pixel()` - Checks if an `active` channel's `pixels_fed` < its `pixel_count`. If so, the channel's `layout`
+is called to update the channel's `chain_index` value, `feed_pixel()` is called on the channel's `pixel_feed`,
+`pixels_fed` is incremented, and the channel's `tx_pixels_enabled` bit is set to ON. If not, `close_frame()` is called
+on the channel's `pixel_feed`, `frames_fed` is incremented, the channel's `tx_bytes_fed_reset_target` is set, and the
+state machine is transitioned from `active` to `terminal`.
+* `disable_tx_pixel()` - Checks if a `terminal` channel's `tx_pixels_enabled` bit is set to ON. If so, clears the
+channel's `tx_pixel` value to 0, and the channel's `tx_pixels_enabled` bit is set to OFF. If not, the state machine is
+transitioned from `terminal` to `resetting`.
+* `advance_reset_count()` - Checks if a `terminal` or `resetting` channel's `tx_bytes_fed_reset_target` has been met.
+If so, the state machine is transitioned to `idle`.
+
+The pixel TX loop calls `advance_tx_bytes()` to advance the tx_bytes_feed state machines and ensure that all channel's
+`tx_pixel` buffer data is up-to-date before triggering the next DMA transfer. This invokes the following state machine
+function calls:
+1. When it's time to load 3-byte pixels:
+    1. Call `activate_when_ready()` on all `idle-3-byte` state machines
+    2. Call `advance_tx_pixel()` on all `active-3-byte` state machines
+    3. Call `disable_tx_pixel()` on all `terminal-3-byte` state machines
+    4. Swap the 3-byte channels' `tx_pixel` double buffers
+2. When it's time to load 4-byte pixels:
+    1. Call `activate_when_ready()` on all `idle-4-byte` state machines
+    2. Call `advance_tx_pixel()` on all `active-4-byte` state machines
+    3. Call `disable_tx_pixel()` on all `terminal-4-byte` state machines
+    4. Swap the 4-byte channels' `tx_pixel` double buffers
+3. Call `advance_reset_count()` on all `terminal-3-byte` state machines
+4. Call `advance_reset_count()` on all `terminal-4-byte` state machines
+5. Call `advance_reset_count()` on all `resetting` state machines
+6. Increment the `tx_bytes_fed` counter
+
+The pixel TX loop implements these steps:
+1. Call `advance_tx_bytes()`
+2. Wait for the previous `tx_data` transfer to complete
+3. Stage current `tx_enabled` bit values into the `tx_data` buffer
+4. Wait till sufficient space is available in the PIO input queues
+5. Trigger the next DMA transfer
+6. Check if a stall was recorded on the previous loop, if so log it in the tick_log
+7. Capture a systick timestamp marking the end of this loop iteration
+8. Repeat 
+
 
 ### Pixel feeds
 #### [pixel_feeds](main/pixel_feeds/)
