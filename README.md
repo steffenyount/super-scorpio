@@ -96,7 +96,7 @@ per Byte)
 `tx_data`
 * Data frames are started either based on a timer interval or the `pixel_feeds_ready` flag being set for their channel
 * 4x PIO processors monitor 4 channels of input LED bit data deserializing them into `rx_bytes`
-* The `rx_bytes` are DMA's into `rx_channel` byte buffers, overflow `rx_bytes` are dropped
+* The `rx_bytes` are DMA'd into `rx_channel` byte buffers, overflow `rx_bytes` are dropped
 * When the end of an input frame is detected by the PIO, IRQ handlers are triggered that run on core0 
 * The PIO and DMA are reset to receive the next frame
 * The RX channel's `byte_count` and other stats are updated
@@ -128,7 +128,7 @@ void log_tick_with_string(char * msg, char * string)
 void log_tick_with_value(char * msg, uint32_t uint32)
 ```
 
-Individual log messages are recorded in less than 10 CPU steps, making this a useful tool for log-debugging in
+Individual log messages are recorded in less than 20 CPU instructions, making this a useful tool for log-debugging in
 situations with tight timing or processing constraints.
 
 The heavy lifting for the printf msg string token evaluation is processed outside the critical path, when there's CPU
@@ -156,7 +156,7 @@ uint32_t get_precision_power_sample(uint32_t bits)
 ### LED segment discovery
 #### [channel_control](main/channel_control/)
 The ARGB LEDs on a channel can be controlled by sending bit data directly to them using one of the RP2040 PWM
-controllers. With help from some clever DMA feed chain rules, this work can be queued up and launched by the CPU. It
+controllers. With help from some clever DMA feed chain rules, this work can be queued up and launched by the CPU. DMA
 then proceeds through till completion asynchronously.
 ```
 void set_gpio_channel_pixels_on_for_byte_range(uint8_t gpio_num, uint32_t start, uint32_t end)
@@ -185,7 +185,7 @@ The power limiter implements a crude system at startup to avoid exceeding power 
 on all channels, we turn the LEDs on, channel by channel, 16 pixels at a time, and sample our power usage after each
 increment. If we exceed our 10A threshold value, we break, turn off all the lights again, and remove any LEDs
 registered for channels beyond where we exceeded that threshold in our linear channel by channel testing. This disables
-the excess LEDs, preventing their use during that session, and thus caps their power draw until the Super Scorpio is
+the excess LEDs, preventing their use during the current session, and thus caps the power draw until the Super Scorpio is
 rebooted.
 ```
 void limit_tx_channel_power()
@@ -303,8 +303,8 @@ the state machine is transitioned from `idle` to `active`.
 * `advance_tx_pixel()` - Checks if an `active` channel's `pixels_fed` < its `pixel_count`. If so, the channel's `layout`
 is called to update the channel's `chain_index` value, `feed_pixel()` is called on the channel's `pixel_feed`,
 `pixels_fed` is incremented, and the channel's `tx_pixels_enabled` bit is set to ON. If not, `close_frame()` is called
-on the channel's `pixel_feed`, `frames_fed` is incremented, the channel's `tx_bytes_fed_reset_target` is set, and the
-state machine is transitioned from `active` to `terminal`.
+on the channel's `pixel_feed`, `frames_fed` is incremented, the channel's `tx_bytes_fed_reset_target` timer is set, and
+the state machine is transitioned from `active` to `terminal`.
 * `disable_tx_pixel()` - Checks if a `terminal` channel's `tx_pixels_enabled` bit is set to ON. If so, clears the
 channel's `tx_pixels` value to 0, and the channel's `tx_pixels_enabled` bit is set to OFF. If not, the state machine is
 transitioned from `terminal` to `resetting`.
@@ -354,8 +354,8 @@ typically called multiple times per frame to update the channel's `tx_pixels` va
 pixel data from each frame. In the case of generated frame content, an animated pixel feed may generate pixel data
 algorithmically and on-demand based on the channel's immediate `chain_index` and `frames_fed` values.
 
-3  pixel feeds have been implemented: `empty_feed`, `rx_channel_feed`, and `on_off_feed`. The first is a No-Op feed, the
-second relays `rx_channel` data, and the third implements a rudimentary animation generating frame content. The
+Three pixel feeds have been implemented: `empty_feed`, `rx_channel_feed`, and `on_off_feed`. The first is a No-Op feed,
+the second relays `rx_channel` data, and the third implements a rudimentary animation generating frame content. The
 `pixel_feed` abstraction is flexible and can be extended. Helper functions are provided to assist when assigning feeds
 to channels or to chains of channels in the `init_pixel_feeds()` function:
 ```
